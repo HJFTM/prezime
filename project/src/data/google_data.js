@@ -1,6 +1,7 @@
 // Sheet config
 const SHEET_ID = "17tcIv9dwmQ-pT2B5Dq4Wk6iQcHM-az6bsuoLLj3sSvk";
-const API_KEY = "AIzaSyBh7W54jknREsNQzmKIMjnPBCuow1RzNAs";
+const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+
 const SHEET_NAME = "ALATI!A1:E100"; 
 
 // Generiši URL
