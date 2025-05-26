@@ -1,6 +1,6 @@
 // Sheet config
 const SHEET_ID = "17tcIv9dwmQ-pT2B5Dq4Wk6iQcHM-az6bsuoLLj3sSvk";
-const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+const API_KEY = "AIzaSyBh7W54jknREsNQzmKIMjnPBCuow1RzNA";
 
 const SHEET_NAME = "ALATI!A1:E100"; 
 
@@ -8,6 +8,8 @@ const SHEET_NAME = "ALATI!A1:E100";
 const url =`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME)}?key=${API_KEY}`;
 
 export async function loadSheetAsJSON() {
+  console.log("API_KEY:", API_KEY); // Trebalo bi da ispiše ključ, a ne undefined
+
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
