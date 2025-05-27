@@ -1,8 +1,8 @@
 // Sheet config
-const SHEET_ID = "17tcIv9dwmQ-pT2B5Dq4Wk6iQcHM-az6bsuoLLj3sSvk";
-const API_KEY = "AIzaSyBh7W54jknREsNQzmKIMjnPBCuow1RzNA";
+const SHEET_ID = "12A_82VHqvqtYbKmv0TgO6MUukJPr5kUXe7Bv3FLv8zo";
+const API_KEY = "AIzaSyBh7W54jknREsNQzmKIMjnPBCuow1RzNAs";
 
-const SHEET_NAME = "ALATI!A1:E100"; 
+const SHEET_NAME = "BOSNA!A1:E100"; 
 
 // Generiši URL
 const url =`https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME)}?key=${API_KEY}`;
