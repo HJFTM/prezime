@@ -12,36 +12,39 @@ jobs:
       contents: write
 
     steps:
-      # 1) Checkout default branch (npr. main) s cijelom poviješću
+      # 1) Checkout default grane (npr. main) s poviješću
       - name: Checkout default branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2) Ako gh-pages ne postoji, kreiraj je (s praznim index.html)
+      # 2) Ako gh-pages ne postoji, kreiraj je (bez pokušaja "switch back")
       - name: Ensure gh-pages branch exists
+        shell: bash
         run: |
           if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
             echo "gh-pages not found; creating…"
             git switch --orphan gh-pages
-            git rm -rf . || true
+            # Repo je prazan; ukloni sve ako ih ima, ignoriraj kad nema (nema fatal poruke)
+            git rm -r -f --ignore-unmatch * .[^.]* || true
             echo "<!doctype html><meta charset=utf-8><title>prezime</title>" > index.html
             git -c user.name="GitHub Action" -c user.email="action@github.com" add -A
             git -c user.name="GitHub Action" -c user.email="action@github.com" commit -m "Initialize gh-pages"
             git push origin gh-pages
-            git switch -
+            # NEMA 'git switch -' ovdje
           else
             echo "gh-pages exists."
           fi
 
-      # 3) Prebaci se na gh-pages granu
+      # 3) Sigurno radimo na gh-pages (bilo da je postojala ili tek kreirana)
       - name: Checkout gh-pages
         uses: actions/checkout@v4
         with:
           ref: gh-pages
 
-      # 4) POTPUNO OČISTI gh-pages (svaki run kreće od nule)
+      # 4) POTPUNO OČISTI gh-pages radni direktorij (svaki run od nule)
       - name: Clean gh-pages working tree
+        shell: bash
         run: |
           shopt -s dotglob
           for p in *; do
@@ -49,10 +52,11 @@ jobs:
               rm -rf "$p"
             fi
           done
-          mkdir -p raw site
+          mkdir -p raw site scripts
 
       # 5) Kloniraj izvorne gh-pages grane u raw/
-      #    Ako su privatni repoji, zamijeni URL s PAT: https://x-access-token:${{ secrets.SOURCE_PAT }}@github.com/HJFTM/uvod.git
+      #    Ako su privatni repoji, zamijeni URL-ove s PAT varijantom:
+      #    https://x-access-token:${{ secrets.SOURCE_PAT }}@github.com/HJFTM/uvod.git
       - name: Fetch source gh-pages
         run: |
           git clone --depth=1 --branch gh-pages https://github.com/HJFTM/uvod.git      raw/Uvod
@@ -60,7 +64,7 @@ jobs:
           git clone --depth=1 --branch gh-pages https://github.com/HJFTM/stupnik.git   raw/Stupnik
           git clone --depth=1 --branch gh-pages https://github.com/HJFTM/dubrovnik.git raw/Dubrovnik
 
-      # 6) Node okruženje
+      # 6) Postavi Node
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -71,16 +75,23 @@ jobs:
         run: |
           npm install puppeteer fs-extra
 
-      # 8) Pokreni render + rewrite linkova
+      # 8) (Opcionalno) Donesi skriptu ako je na default grani; preskoči ako je već u repou
+      #    Ako skripta živi u istom repou na default grani, možemo je kopirati
+      # - name: Retrieve snapshot script from default branch
+      #   run: |
+      #     git fetch origin +refs/heads/${{ github.event.repository.default_branch || 'main' }}:refs/remotes/origin/default
+      #     git show origin/default:scripts/rewrite-and-snapshot.js > scripts/rewrite-and-snapshot.js
+
+      # 9) Pokreni render + rewrite linkova
       - name: Run rewrite + snapshot
         run: node scripts/rewrite-and-snapshot.js
 
-      # 9) Objavi site/ u root gh-pages (čisti publish)
+      # 10) Objavi site/ u root gh-pages (čisti publish)
       - name: Publish site to gh-pages root
         run: |
           rsync -av --delete site/ ./
 
-      # 10) Commit & push
+      # 11) Commit & push
       - name: Commit & push
         run: |
           git config user.name "GitHub Action"
