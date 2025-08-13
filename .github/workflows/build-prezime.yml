@@ -1,0 +1,60 @@
+name: Build prezime from existing gh-pages
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "10 3 * * *"   # svako jutro
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout prezime (gh-pages)
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Prepare folders
+        run: |
+          rm -rf raw site
+          mkdir -p raw
+
+      - name: Fetch source gh-pages
+        run: |
+          # kloniramo public gh-pages grane; ako su privatni repoji, koristi PAT i https://<token>@github.com/...
+          git clone --depth=1 --branch gh-pages https://github.com/HJFTM/uvod.git      raw/Uvod
+          git clone --depth=1 --branch gh-pages https://github.com/HJFTM/bosna.git     raw/Bosna
+          git clone --depth=1 --branch gh-pages https://github.com/HJFTM/stupnik.git   raw/Stupnik
+          git clone --depth=1 --branch gh-pages https://github.com/HJFTM/dubrovnik.git raw/Dubrovnik
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: |
+          npm install puppeteer fs-extra
+
+      - name: Run rewrite + snapshot
+        run: node scripts/rewrite-and-snapshot.js
+
+      - name: Publish site/
+        run: |
+          # kopiraj site/ u root grane (https://hjftm.github.io/prezime/<Projekt>/...)
+          rsync -av --delete site/ ./
+
+      - name: Commit & push
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "Rebuild prezime snapshots $(date -u +%F_%T)"
+            git push origin gh-pages
+          fi
