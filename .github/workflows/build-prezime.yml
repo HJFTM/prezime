@@ -40,17 +40,17 @@ jobs:
         with:
           ref: gh-pages
 
-      # 4) Čisti start svakog runa
-      - name: Clean gh-pages working tree
-        shell: bash
-        run: |
-          shopt -s dotglob
-          for p in *; do
-            if [ "$p" != ".git" ]; then
-              rm -rf "$p"
-            fi
-          done
-          mkdir -p raw site scripts
+    # 4) Čisti start svakog runa (NE brišemo .git)
+          - name: Clean gh-pages working tree
+            shell: bash
+            run: |
+              shopt -s dotglob
+              for p in *; do
+                if [ "$p" != ".git" ]; then
+                  rm -rf "$p"
+                fi
+              done
+              mkdir -p raw site scripts
 
       # 5) Kloniraj izvorne gh-pages grane
       - name: Fetch source gh-pages
@@ -204,12 +204,12 @@ jobs:
       - name: Run rewrite + snapshot
         run: node scripts/rewrite-and-snapshot.js
 
-      # 9) Objavi site/ u root gh-pages
+      # 9) Objavi site/ u root gh-pages (NE brišemo .git)
       - name: Publish site to gh-pages root
         run: |
-          rsync -av --delete site/ ./
+          rsync -av --delete --exclude='.git' site/ ./
 
-      # 10) Commit & push
+      # 10) Commit & push (sigurno smo u git diru)
       - name: Commit & push
         run: |
           git config user.name "GitHub Action"
