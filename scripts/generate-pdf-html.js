@@ -5,16 +5,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
-import { CURRENT_PROJECT } from '../observablehq.base.js'; // zadržavamo, koristi se za BASE_URL
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // 1) Odredi BASE_URL projekta (hostano na GH Pages)
-const BASE_URL =
-  CURRENT_PROJECT === 'Uvod'
-    ? 'https://hjftm.github.io/uvod'
-    : `https://hjftm.github.io/${CURRENT_PROJECT.toLowerCase()}`;
+const BASE_URL = 'https://hjftm.github.io/prezime';
 
 // 2) Gdje je lokalno COPY objavljenog sajta (gh-pages branch)?
 //    Možeš promijeniti putem SOURCE_DIR env var (apsolutna ili relativna putanja)
