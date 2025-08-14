@@ -1,24 +1,24 @@
-name: Build prezime from existing gh-pages (clean run)
+name: Sync gh-pages from multiple repos
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "10 3 * * *"   # dnevno
+    - cron: "15 3 * * *"  # dnevno u 03:15 UTC
 
 jobs:
-  build:
+  sync:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write   # omogućuje push u trenutni repo
 
     steps:
-      # 1) Checkout default branch (samo radi git konteksta i provjere grane)
+      # 1) Checkout default branch (s poviješću) da možemo kreirati gh-pages ako ne postoji
       - name: Checkout default branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2) Ako gh-pages ne postoji, kreiraj je (bez pokušaja vraćanja na prethodnu granu)
+      # 2) Kreiraj gh-pages ako ne postoji (s minimalističkim index.html)
       - name: Ensure gh-pages branch exists
         shell: bash
         run: |
@@ -34,187 +34,48 @@ jobs:
             echo "gh-pages exists."
           fi
 
-      # 3) Sada radimo direktno na gh-pages
+      # 3) Sada radimo na gh-pages grani
       - name: Checkout gh-pages
         uses: actions/checkout@v4
         with:
           ref: gh-pages
 
-      # 4) Čisti start (NE briši .git!)
-      - name: Clean gh-pages working tree
+      # 4) Pripremi radni dir (NE briši .git). Očisti odredišne podmape za čist sync.
+      - name: Prepare folders
         shell: bash
         run: |
           shopt -s dotglob
-          for p in *; do
-            if [ "$p" != ".git" ]; then
-              rm -rf "$p"
-            fi
+          mkdir -p Uvod Bosna Stupnik Dubrovnik tmp
+          rm -rf Uvod/* Bosna/* Stupnik/* Dubrovnik/*
+
+      # 5) Kloniraj izvorne gh-pages grane i rsync u podmape
+      - name: Clone source gh-pages and sync
+        shell: bash
+        run: |
+          # Ako su repoji privatni, koristi PAT varijantu (otkomentiraj linije ispod i dodaj secret SOURCE_PAT):
+          # SRC="https://x-access-token:${{ secrets.SOURCE_PAT }}@github.com/HJFTM"
+          # Ako su javni:
+          SRC="https://github.com/HJFTM"
+
+          declare -A MAP=( \
+            ["uvod"]="uvod" \
+            ["bosna"]="bosna" \
+            ["stupnik"]="stupnik" \
+            ["dubrovnik"]="dubrovnik" \
+          )
+
+          for repo in "${!MAP[@]}"; do
+            dir="${MAP[$repo]}"
+            echo ">>> Syncing $repo -> $dir/"
+            git clone --depth=1 --branch gh-pages "$SRC/$repo.git" "tmp/$repo"
+            rsync -av --delete "tmp/$repo/" "$dir/"
           done
-          mkdir -p raw site scripts
 
-      # 5) Kloniraj izvorne gh-pages grane
-      #    Ako su privatni, zamijeni URL s PAT varijantom:
-      #    https://x-access-token:${{ secrets.SOURCE_PAT }}@github.com/HJFTM/uvod.git
-      - name: Fetch source gh-pages
-        shell: bash
-        run: |
-          git clone --depth=1 --branch gh-pages https://github.com/HJFTM/uvod.git      raw/Uvod
-          git clone --depth=1 --branch gh-pages https://github.com/HJFTM/bosna.git     raw/Bosna
-          git clone --depth=1 --branch gh-pages https://github.com/HJFTM/stupnik.git   raw/Stupnik
-          git clone --depth=1 --branch gh-pages https://github.com/HJFTM/dubrovnik.git raw/Dubrovnik
+          rm -rf tmp
 
-      # 6) Upisi snapshot skriptu (here-doc) u ovaj radni dir (gh-pages)
-      - name: Write rewrite-and-snapshot.js
-        shell: bash
-        run: |
-          cat > scripts/rewrite-and-snapshot.js <<'JS'
-          // Node 20+ | npm i puppeteer fs-extra
-          import fs from "fs-extra";
-          import path from "path";
-          import puppeteer from "puppeteer";
-
-          const RAW_DIR = "raw";   // klonirani gh-pages iz drugih repo-a
-          const OUT_DIR = "site";  // finalni statički output
-
-          const PROJECTS = [
-            { name: "Uvod",      base: "https://hjftm.github.io/uvod" },
-            { name: "Bosna",     base: "https://hjftm.github.io/bosna" },
-            { name: "Stupnik",   base: "https://hjftm.github.io/stupnik" },
-            { name: "Dubrovnik", base: "https://hjftm.github.io/dubrovnik" },
-          ];
-
-          const ROOTS = ["pages", "ENTITET", ""];
-          const NAV_TIMEOUT = 90_000;
-          const SETTLE_MS = 600;
-
-          function listIndexDirs(rootDir) {
-            const res = [];
-            function walk(dir) {
-              const entries = fs.readdirSync(dir, { withFileTypes: true });
-              let hasIndex = false;
-              for (const e of entries) if (e.isFile() && e.name.toLowerCase() === "index.html") hasIndex = true;
-              if (hasIndex) res.push(dir);
-              for (const e of entries) if (e.isDirectory()) walk(path.join(dir, e.name));
-            }
-            if (fs.existsSync(rootDir)) walk(rootDir);
-            return res;
-          }
-
-          function relPath(absDir, siteRootAbs) {
-            let rel = path.relative(siteRootAbs, absDir).split(path.sep).join("/");
-            if (!rel.startsWith("/")) rel = "/" + rel;
-            return rel; // npr. /pages/ENTITET/obitelj/Ilarić
-          }
-
-          function publicUrl(base, rel) {
-            const u = new URL(base);
-            const joined = (u.pathname.replace(/\/$/, "") + rel).replace(/\/{2,}/g, "/");
-            u.pathname = joined.endsWith("/") ? joined : joined + "/";
-            u.search = ""; u.hash = "";
-            return u.toString();
-          }
-
-          async function singlefile(page) {
-            await page.addScriptTag({ url: "https://unpkg.com/single-file-core@1.2.42/single-file-core.bundle.js" });
-            const { content } = await page.evaluate(async () => {
-              const r = await window.singlefile.getPageData({
-                loadDeferredImages: true,
-                loadDeferredImagesMaxIdleTime: 1500,
-                removeHiddenElements: false,
-                removeUnusedStyles: false,
-                compressHTML: false,
-                maxResourceSizeEnabled: true,
-                maxResourceSize: 80 * 1024 * 1024,
-              });
-              return { content: r.content };
-            });
-            return content;
-          }
-
-          function rewriteLinks(html, projectName) {
-            const reps = [
-              { from: /https?:\/\/hjftm\.github\.io\/uvod/gi,      to: "/prezime/Uvod" },
-              { from: /https?:\/\/hjftm\.github\.io\/bosna/gi,     to: "/prezime/Bosna" },
-              { from: /https?:\/\/hjftm\.github\.io\/stupnik/gi,   to: "/prezime/Stupnik" },
-              { from: /https?:\/\/hjftm\.github\.io\/dubrovnik/gi, to: "/prezime/Dubrovnik" },
-              { from: /href="\/pages/gi, to: `href="/prezime/${projectName}/pages` },
-              { from: /src="\/pages/gi,  to: `src="/prezime/${projectName}/pages`  },
-            ];
-            return reps.reduce((acc, r) => acc.replace(r.from, r.to), html);
-          }
-
-          async function outFile(projectName, rel) {
-            const out = path.join(OUT_DIR, projectName, rel.replace(/^\//, ""), "index.html");
-            await fs.ensureDir(path.dirname(out));
-            return out;
-          }
-
-          async function snapshotProject(browser, name, base) {
-            const siteRoot = path.resolve(RAW_DIR, name);
-            const scanRoots = ROOTS.map(r => path.join(siteRoot, r)).filter(fs.existsSync);
-            const dirs = scanRoots.flatMap(d => listIndexDirs(d));
-            const items = dirs.map(d => {
-              const rel = relPath(d, siteRoot);
-              const url = publicUrl(base, rel);
-              return { rel, url };
-            });
-
-            console.log(`→ ${name}: ${items.length} stranica`);
-
-            const page = await browser.newPage();
-            page.setDefaultTimeout(NAV_TIMEOUT);
-
-            for (const { rel, url } of items) {
-              try {
-                await page.goto(url, { waitUntil: "networkidle0" });
-                await page.waitForTimeout(SETTLE_MS);
-                let html = await singlefile(page);
-                html = rewriteLinks(html, name);
-                const of = await outFile(name, rel);
-                await fs.writeFile(of, html, "utf8");
-                console.log("✔", name, rel);
-              } catch (e) {
-                console.warn("⚠️", name, rel, url, e?.message || e);
-              }
-            }
-            await page.close();
-          }
-
-          (async () => {
-            await fs.emptyDir(OUT_DIR);
-            const browser = await puppeteer.launch({ headless: "new", args: ["--no-sandbox","--disable-setuid-sandbox"] });
-            try {
-              for (const p of PROJECTS) {
-                await snapshotProject(browser, p.name, p.base);
-              }
-            } finally {
-              await browser.close();
-            }
-            console.log("Done →", OUT_DIR);
-          })();
-          JS
-
-      # 7) Node + deps
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install deps
-        run: |
-          npm install puppeteer fs-extra
-
-      # 8) Render + rewrite (skripta sigurno postoji)
-      - name: Run rewrite + snapshot
-        run: node scripts/rewrite-and-snapshot.js
-
-      # 9) Objavi site/ u root gh-pages (NE diraj .git)
-      - name: Publish site to gh-pages root
-        run: |
-          rsync -av --delete --exclude='.git' site/ ./
-
-      # 10) Commit & push
+      # 6) Commit & push promjene u gh-pages
       - name: Commit & push
+        shell: bash
         run: |
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
@@ -222,6 +83,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes."
           else
-            git commit -m "Rebuild prezime snapshots $(date -u +%F_%T)"
+            git commit -m "Sync gh-pages from uvod/bosna/stupnik/dubrovnik ($(date -u +%F_%T))"
             git push origin gh-pages
           fi
