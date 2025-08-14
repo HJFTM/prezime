@@ -1,3 +1,7 @@
+# napraviti konfiguraciju repositorija (uvod, bosna, stupnik...)
+# uključiti foldere i podfoldere: gh-pages/_file, gh-pages/_npm, gh-pages/_observablehq, gh-pages/pages
+# ? pretvoriti linkove?
+
 name: Sync ONLY pages/ from uvod/bosna/stupnik/dubrovnik into gh-pages subfolders
 
 on:
