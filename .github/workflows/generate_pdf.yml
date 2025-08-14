@@ -1,32 +1,55 @@
-- name: Checkout main
-  uses: actions/checkout@v4
-  with:
-    ref: main
-    path: main
+name: Generate PDFs for All Pages
 
-- name: Checkout gh-pages
-  uses: actions/checkout@v4
-  with:
-    ref: gh-pages
-    path: gh-pages
+on:
+  workflow_dispatch:    # Ručno pokretanje
+  push:
+    branches:
+      - main            # Pokreće se na push u main granu
 
-- name: Setup Node.js
-  uses: actions/setup-node@v4
-  with:
-    node-version: 20
+permissions:
+  contents: write       # Potrebno za commit/push
 
-- name: Install Puppeteer
-  working-directory: main
-  run: npm ci
+jobs:
+  build-pdfs:
+    runs-on: ubuntu-latest
 
-- name: Generate PDFs for all pages/*.html
-  env:
-    CURRENT_PROJECT: ${{ vars.CURRENT_PROJECT }}   # npr. uvod / bosna / stupnik / dubrovnik
-    GH_PAGES_DIR: gh-pages
-    PAGES_DIR: pages
-    PUBLIC_HOST: https://hjftm.github.io
-    # Ako trebaš postaviti ROD:
-    # APPEND_QUERY: "?ROD=Bosna"
-  run: node main/scripts/generate-pdf-html.js
+    env:
+      CURRENT_PROJECT: ${{ vars.CURRENT_PROJECT }} # ili hardcode, npr. uvod
+      GH_PAGES_DIR: gh-pages
+      PAGES_DIR: pages
+      PUBLIC_HOST: https://hjftm.github.io
+      # APPEND_QUERY: "?ROD=Bosna"  # odkomentiraj po potrebi
 
-# (nakon toga commit/push u gh-pages, npr. s peaceiris/actions-gh-pages ili ručno)
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Puppeteer
+        working-directory: main
+        run: npm ci
+
+      - name: Generate PDFs from all HTML files
+        run: node main/scripts/generate-pdf-html.js
+
+      - name: Commit and push generated PDFs
+        working-directory: gh-pages
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add .
+          git commit -m "Add generated PDFs from HTML pages ($(date +'%Y-%m-%d_%H:%M:%S'))" || echo "No changes to commit"
+          git push origin gh-pages
