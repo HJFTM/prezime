@@ -1,0 +1,129 @@
+name: Sync specified folders from repositories into gh-pages subfolders
+
+on:
+  workflow_dispatch:
+    inputs:
+      repositories:
+        description: 'Comma-separated list of repositories (e.g., uvod,bosna,stupnik,dubrovnik)'
+        required: false
+        default: 'uvod,bosna,stupnik,dubrovnik'
+      folders:
+        description: 'Comma-separated list of folders to include (e.g., pages,_file,_npm,_observablehq)'
+        required: false
+        default: 'pages,_file,_npm,_observablehq'
+
+env:
+  DEFAULT_REPOSITORIES: 'uvod,bosna,stupnik,dubrovnik'
+  DEFAULT_FOLDERS: 'pages,_file,_npm,_observablehq'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      # Define default values
+      - name: Set default values
+        id: defaults
+        run: |
+          echo "REPOSITORIES=${{ inputs.repositories || env.DEFAULT_REPOSITORIES }}" >> $GITHUB_ENV
+          echo "FOLDERS=${{ inputs.folders || env.DEFAULT_FOLDERS }}" >> $GITHUB_ENV
+
+      # 1) Checkout default branch to initialize gh-pages if needed
+      - name: Checkout default branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 2) Ensure gh-pages exists
+      - name: Ensure gh-pages exists
+        shell: bash
+        run: |
+          if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
+            git switch --orphan gh-pages
+            git rm -r -f --ignore-unmatch * .[^.]* || true
+            echo "<!doctype html><title>prezime</title>" > index.html
+            git -c user.name="GitHub Action" -c user.email="action@github.com" add -A
+            git -c user.name="GitHub Action" -c user.email="action@github.com" commit -m "init gh-pages"
+            git push origin gh-pages
+          fi
+
+      # 3) Checkout gh-pages branch
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      # 4) Clean target subfolders and remove gitlinks
+      - name: Clean target subfolders and remove gitlinks
+        shell: bash
+        run: |
+          git ls-files -s | awk '$1=="160000"{print $4}' | while read p; do
+            echo "Removing gitlink from index: $p"
+            git rm -f --cached "$p" || true
+            rm -rf "$p" || true
+          done
+
+          IFS=',' read -ra REPOS <<< "${{ env.REPOSITORIES }}"
+          for repo in "${REPOS[@]}"; do
+            rm -rf "$repo"
+            mkdir -p "$repo/pages"
+          done
+          rm -rf tmp
+          mkdir -p tmp
+
+      # 5) Clone source repos
+      - name: Clone source repos
+        shell: bash
+        run: |
+          SRC="https://github.com/HJFTM"
+          IFS=',' read -ra REPOS <<< "${{ env.REPOSITORIES }}"
+          for repo in "${REPOS[@]}"; do
+            git clone --depth=1 --branch gh-pages "$SRC/$repo.git" tmp/"$repo"
+          done
+
+      # 6) Export specified folders into subfolders (no git metadata)
+      - name: Export specified folders into subfolders
+        shell: bash
+        run: |
+          IFS=',' read -ra FOLDERS <<< "${{ env.FOLDERS }}"
+          export_folders () {
+            local src="$1" dest="$2"
+            for folder in "${FOLDERS[@]}"; do
+              if git -C "tmp/$src" cat-file -e gh-pages:"$folder" 2>/dev/null; then
+                git -C "tmp/$src" archive --format=tar gh-pages "$folder" \
+                  | tar -x -C "$dest"
+              else
+                echo "WARN: tmp/$src nema '$folder' na gh-pages – preskačem."
+              fi
+            done
+          }
+
+          IFS=',' read -ra REPOS <<< "${{ env.REPOSITORIES }}"
+          for repo in "${REPOS[@]}"; do
+            export_folders "$repo" "$repo"
+          done
+
+          rm -rf tmp
+
+      # (optional) Debug diff
+      - name: Debug diff
+        shell: bash
+        run: |
+          echo "Changed files:"
+          git status --porcelain | sed -n '1,200p' || true
+
+      # 7) Commit & push
+      - name: Commit & push
+        shell: bash
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "Sync specified folders from repositories ($(date -u +%F_%T))"
+            git push origin gh-pages
