@@ -2,7 +2,7 @@
 # uključiti foldere i podfoldere: gh-pages/_file, gh-pages/_npm, gh-pages/_observablehq, gh-pages/pages
 # ? pretvoriti linkove?
 
-name: Sync ONLY pages/ from uvod/bosna/stupnik/dubrovnik into gh-pages subfolders
+name: Copy 2
 
 on:
   workflow_dispatch:
@@ -79,9 +79,14 @@ jobs:
               # kreira tar s prefiksom "pages/" iz izvora, pa raspakira u destinaciju
               git -C "tmp/$src" archive --format=tar gh-pages pages \
                 | tar -x -C "$dest"
-            else
-              echo "WARN: tmp/$src nema 'pages/' na gh-pages – preskačem."
             fi
+
+            if git -C "tmp/$src" cat-file -e gh-pages:_observablehq 2>/dev/null; then
+              # kreira tar s prefiksom "_observablehq/" iz izvora, pa raspakira u destinaciju
+              git -C "tmp/$src" archive --format=tar gh-pages _observablehq \
+                | tar -x -C "$dest"
+            fi
+            
           }
 
           export_pages uvod      Uvod
