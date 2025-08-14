@@ -1,20 +1,11 @@
-name: Sync specified folders from repositories into gh-pages subfolders
+# napraviti konfiguraciju repositorija (uvod, bosna, stupnik...)
+# uključiti foldere i podfoldere: gh-pages/_file, gh-pages/_npm, gh-pages/_observablehq, gh-pages/pages
+# ? pretvoriti linkove?
+
+name: Sync 2 into gh-pages subfolders
 
 on:
   workflow_dispatch:
-    inputs:
-      repositories:
-        description: 'Comma-separated list of repositories (e.g., uvod,bosna,stupnik,dubrovnik)'
-        required: false
-        default: 'uvod,bosna,stupnik,dubrovnik'
-      folders:
-        description: 'Comma-separated list of folders to include (e.g., pages,_file,_npm,_observablehq)'
-        required: false
-        default: 'pages,_file,_npm,_observablehq'
-
-env:
-  DEFAULT_REPOSITORIES: 'uvod,bosna,stupnik,dubrovnik'
-  DEFAULT_FOLDERS: 'pages,_file,_npm,_observablehq'
 
 jobs:
   sync:
@@ -23,20 +14,13 @@ jobs:
       contents: write
 
     steps:
-      # Define default values
-      - name: Set default values
-        id: defaults
-        run: |
-          echo "REPOSITORIES=${{ inputs.repositories || env.DEFAULT_REPOSITORIES }}" >> $GITHUB_ENV
-          echo "FOLDERS=${{ inputs.folders || env.DEFAULT_FOLDERS }}" >> $GITHUB_ENV
-
-      # 1) Checkout default branch to initialize gh-pages if needed
+      # 1) Checkout default grane da možemo inicijalizirati gh-pages po potrebi
       - name: Checkout default branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2) Ensure gh-pages exists
+      # 2) Kreiraj gh-pages ako ne postoji
       - name: Ensure gh-pages exists
         shell: bash
         run: |
@@ -49,66 +33,65 @@ jobs:
             git push origin gh-pages
           fi
 
-      # 3) Checkout gh-pages branch
+      # 3) Checkout gh-pages kao radni dir
       - name: Checkout gh-pages branch
         uses: actions/checkout@v4
         with:
           ref: gh-pages
           fetch-depth: 0
 
-      # 4) Clean target subfolders and remove gitlinks
+      # 4) Očisti ciljane podmape i ukloni moguće gitlinkove iz indexa
       - name: Clean target subfolders and remove gitlinks
         shell: bash
         run: |
+          # Ukloni gitlinkove (submodule zapise) ako postoje
           git ls-files -s | awk '$1=="160000"{print $4}' | while read p; do
             echo "Removing gitlink from index: $p"
             git rm -f --cached "$p" || true
             rm -rf "$p" || true
           done
 
-          IFS=',' read -ra REPOS <<< "${{ env.REPOSITORIES }}"
-          for repo in "${REPOS[@]}"; do
-            rm -rf "$repo"
-            mkdir -p "$repo/pages"
+          # Čisti i kreiraj odredišta
+          for d in Uvod Bosna Stupnik Dubrovnik; do
+            rm -rf "$d"
+            mkdir -p "$d/pages"
           done
           rm -rf tmp
           mkdir -p tmp
 
-      # 5) Clone source repos
+      # 5) Kloniraj izvore (grane gh-pages)
       - name: Clone source repos
         shell: bash
         run: |
           SRC="https://github.com/HJFTM"
-          IFS=',' read -ra REPOS <<< "${{ env.REPOSITORIES }}"
-          for repo in "${REPOS[@]}"; do
-            git clone --depth=1 --branch gh-pages "$SRC/$repo.git" tmp/"$repo"
-          done
+          git clone --depth=1 --branch gh-pages "$SRC/uvod.git"      tmp/uvod
+          git clone --depth=1 --branch gh-pages "$SRC/bosna.git"     tmp/bosna
+          git clone --depth=1 --branch gh-pages "$SRC/stupnik.git"   tmp/stupnik
+          git clone --depth=1 --branch gh-pages "$SRC/dubrovnik.git" tmp/dubrovnik
 
-      # 6) Export specified folders into subfolders (no git metadata)
-      - name: Export specified folders into subfolders
+      # 6) EKSTRAHIRAJ SAMO pages/ BEZ .git (git archive → tar -x)
+      - name: Export pages/ into subfolders (no git metadata)
         shell: bash
         run: |
-          IFS=',' read -ra FOLDERS <<< "${{ env.FOLDERS }}"
-          export_folders () {
-            local src="$1" dest="$2"
-            for folder in "${FOLDERS[@]}"; do
-              if git -C "tmp/$src" cat-file -e gh-pages:"$folder" 2>/dev/null; then
-                git -C "tmp/$src" archive --format=tar gh-pages "$folder" \
-                  | tar -x -C "$dest"
-              else
-                echo "WARN: tmp/$src nema '$folder' na gh-pages – preskačem."
-              fi
-            done
-          }
+          export_pages () {
+    local src="$1" dest="$2" folder="$3"
+    if git -C "tmp/$src" cat-file -e gh-pages:"$folder" 2>/dev/null; then
+        # kreira tar s prefiksom "folder/" iz izvora, pa raspakira u destinaciju
+        git -C "tmp/$src" archive --format=tar gh-pages "$folder" \
+            | tar -x -C "$dest"
+    else
+        echo "WARN: tmp/$src nema '$folder/' na gh-pages – preskačem."
+    fi
+}
 
-          IFS=',' read -ra REPOS <<< "${{ env.REPOSITORIES }}"
-          for repo in "${REPOS[@]}"; do
-            export_folders "$repo" "$repo"
-          done
 
+          export_pages uvod      Uvod pages
+          export_pages uvod      Uvod _file
+          export_pages uvod      Uvod _observablehq
+          
           rm -rf tmp
 
-      # (optional) Debug diff
+      # (opcionalno) kratki pregled promjena
       - name: Debug diff
         shell: bash
         run: |
@@ -125,5 +108,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes."
           else
-            git commit -m "Sync specified folders from repositories ($(date -u +%F_%T))"
+            git commit -m "Sync pages/ → Uvod|Bosna|Stupnik|Dubrovnik ($(date -u +%F_%T))"
             git push origin gh-pages
+          fi
