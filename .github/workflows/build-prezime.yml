@@ -68,7 +68,7 @@ jobs:
             dir="${MAP[$repo]}"
             echo ">>> Syncing $repo -> $dir/"
             git clone --depth=1 --branch gh-pages "$SRC/$repo.git" "tmp/$repo"
-            rsync -av --delete "tmp/$repo/" "$dir/"
+            rsync -avL --delete "tmp/$repo/" "$dir/"
           done
 
           rm -rf tmp
