@@ -1,55 +1,32 @@
-# FILE: .github/workflows/generate-pdf.yml
+- name: Checkout main
+  uses: actions/checkout@v4
+  with:
+    ref: main
+    path: main
 
-name: Generate PDF (Puppeteer)
+- name: Checkout gh-pages
+  uses: actions/checkout@v4
+  with:
+    ref: gh-pages
+    path: gh-pages
 
-on:
-  workflow_dispatch:
-  push:
-    branches: [main]
+- name: Setup Node.js
+  uses: actions/setup-node@v4
+  with:
+    node-version: 20
 
-permissions:
-  contents: write
+- name: Install Puppeteer
+  working-directory: main
+  run: npm ci
 
-env:
-  CURRENT_PROJECT: ${{ vars.CURRENT_PROJECT }}
+- name: Generate PDFs for all pages/*.html
+  env:
+    CURRENT_PROJECT: ${{ vars.CURRENT_PROJECT }}   # npr. uvod / bosna / stupnik / dubrovnik
+    GH_PAGES_DIR: gh-pages
+    PAGES_DIR: pages
+    PUBLIC_HOST: https://hjftm.github.io
+    # Ako trebaš postaviti ROD:
+    # APPEND_QUERY: "?ROD=Bosna"
+  run: node main/scripts/generate-pdf-html.js
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout main
-        uses: actions/checkout@v3
-        with:
-          ref: main
-          path: main
-
-      - name: Checkout gh-pages
-        uses: actions/checkout@v3
-        with:
-          ref: gh-pages
-          path: gh-pages
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 20
-
-      - name: Install Puppeteer
-        run: npm install puppeteer
-        working-directory: main
-
-      - name: Generate PDF
-        run: node main/scripts/generate-pdf-html.js
-        env:
-          OUTPUT_DIR: ../gh-pages/pdf
-          CURRENT_PROJECT: ${{ env.CURRENT_PROJECT }}
-
-      - name: Commit PDF to gh-pages
-        run: |
-          cd gh-pages
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add pdf/${{ env.CURRENT_PROJECT }}.pdf || echo "⚠️ PDF nije pronađen"
-          git commit -m "📄 Dodan PDF za ${{ env.CURRENT_PROJECT }}" || echo "No changes"
-          git push --force origin gh-pages
+# (nakon toga commit/push u gh-pages, npr. s peaceiris/actions-gh-pages ili ručno)
