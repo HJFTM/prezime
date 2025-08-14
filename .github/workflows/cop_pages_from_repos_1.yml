@@ -1,8 +1,4 @@
-# napraviti konfiguraciju repositorija (uvod, bosna, stupnik...)
-# uključiti foldere i podfoldere: gh-pages/_file, gh-pages/_npm, gh-pages/_observablehq, gh-pages/pages
-# ? pretvoriti linkove?
-
-name: Sync 2 into gh-pages subfolders
+name: Copy 2 
 
 on:
   workflow_dispatch:
@@ -74,15 +70,15 @@ jobs:
         shell: bash
         run: |
           export_pages () {
-    local src="$1" dest="$2" folder="$3"
-    if git -C "tmp/$src" cat-file -e gh-pages:"$folder" 2>/dev/null; then
-        # kreira tar s prefiksom "folder/" iz izvora, pa raspakira u destinaciju
-        git -C "tmp/$src" archive --format=tar gh-pages "$folder" \
-            | tar -x -C "$dest"
-    else
-        echo "WARN: tmp/$src nema '$folder/' na gh-pages – preskačem."
-    fi
-}
+            local src="$1" dest="$2" folder="$3"
+            if git -C "tmp/$src" cat-file -e gh-pages:"$folder" 2>/dev/null; then
+                # kreira tar s prefiksom "folder/" iz izvora, pa raspakira u destinaciju
+                git -C "tmp/$src" archive --format=tar gh-pages "$folder" \
+                    | tar -x -C "$dest"
+            else
+                echo "WARN: tmp/$src nema '$folder/' na gh-pages – preskačem."
+            fi
+        }
 
 
           export_pages uvod      Uvod pages
