@@ -92,7 +92,11 @@ jobs:
               git -C "tmp/$src" archive --format=tar gh-pages _file \
                 | tar -x -C "$dest"
             fi
-            
+            if git -C "tmp/$src" cat-file -e gh-pages:_npm 2>/dev/null; then
+              # kreira tar s prefiksom "_npm/" iz izvora, pa raspakira u destinaciju
+              git -C "tmp/$src" archive --format=tar gh-pages _npm \
+                | tar -x -C "$dest"
+            fi            
             
           }
 
