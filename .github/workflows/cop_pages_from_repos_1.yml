@@ -67,7 +67,7 @@ jobs:
 
       # 6) EKSTRAHIRAJ SAMO pages/ BEZ .git (git archive → tar -x)
       - name: Export pages
-        shell: bash
+      shell: bash
         run: |
           export_pages () {
             local src="$1" dest="$2" folder="$3"
