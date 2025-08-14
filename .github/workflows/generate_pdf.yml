@@ -1,0 +1,55 @@
+# FILE: .github/workflows/generate-pdf.yml
+
+name: Generate PDF (Puppeteer)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+env:
+  CURRENT_PROJECT: ${{ vars.CURRENT_PROJECT }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v3
+        with:
+          ref: main
+          path: main
+
+      - name: Checkout gh-pages
+        uses: actions/checkout@v3
+        with:
+          ref: gh-pages
+          path: gh-pages
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install Puppeteer
+        run: npm install puppeteer
+        working-directory: main
+
+      - name: Generate PDF
+        run: node main/hello-framework/scripts/generate-pdf.js
+        env:
+          OUTPUT_DIR: ../gh-pages/pdf
+          CURRENT_PROJECT: ${{ env.CURRENT_PROJECT }}
+
+      - name: Commit PDF to gh-pages
+        run: |
+          cd gh-pages
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add pdf/${{ env.CURRENT_PROJECT }}.pdf || echo "⚠️ PDF nije pronađen"
+          git commit -m "📄 Dodan PDF za ${{ env.CURRENT_PROJECT }}" || echo "No changes"
+          git push --force origin gh-pages
