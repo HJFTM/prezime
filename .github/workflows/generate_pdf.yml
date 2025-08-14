@@ -44,7 +44,7 @@ jobs:
         run: npm install
       
       - name: Generate ONE combined PDF
-        run: node main/scripts/generate-single-pdf.js
+        run: node main/scripts/generate-pdfs-by-top-level.js
 
       - name: Commit and push generated PDFs
         working-directory: gh-pages
