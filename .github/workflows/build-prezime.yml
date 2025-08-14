@@ -1,4 +1,4 @@
-name: Sync gh-pages from multiple repos
+name: Sync gh-pages from uvod/bosna/stupnik/dubrovnik into this repo (flat)
 
 on:
   workflow_dispatch:
@@ -9,16 +9,16 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     permissions:
-      contents: write   # omogućuje push u trenutni repo
+      contents: write
 
     steps:
-      # 1) Checkout default branch (s poviješću) da možemo kreirati gh-pages ako ne postoji
+      # 1) Checkout default branch da možemo inicijalizirati gh-pages
       - name: Checkout default branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2) Kreiraj gh-pages ako ne postoji (s minimalističkim index.html)
+      # 2) Ako gh-pages ne postoji, kreiraj je
       - name: Ensure gh-pages branch exists
         shell: bash
         run: |
@@ -34,46 +34,54 @@ jobs:
             echo "gh-pages exists."
           fi
 
-      # 3) Sada radimo na gh-pages grani
+      # 3) Radimo na gh-pages
       - name: Checkout gh-pages
         uses: actions/checkout@v4
         with:
           ref: gh-pages
 
-      # 4) Pripremi radni dir (NE briši .git). Očisti odredišne podmape za čist sync.
-      - name: Prepare folders
+      # 4) Čisti start (NE briši .git)
+      - name: Clean gh-pages working tree
         shell: bash
         run: |
           shopt -s dotglob
-          mkdir -p Uvod Bosna Stupnik Dubrovnik tmp
-          rm -rf Uvod/* Bosna/* Stupnik/* Dubrovnik/*
+          for p in *; do
+            if [ "$p" != ".git" ]; then
+              rm -rf "$p"
+            fi
+          done
+          mkdir -p tmp
 
-      # 5) Kloniraj izvorne gh-pages grane i rsync u podmape
-      - name: Clone source gh-pages and sync
+      # 5) Kloniraj source gh-pages grane
+      #    Ako su privatni repoji, koristi PAT: https://x-access-token:${{ secrets.SOURCE_PAT }}@github.com/HJFTM/uvod.git
+      - name: Clone source gh-pages
         shell: bash
         run: |
-          # Ako su repoji privatni, koristi PAT varijantu (otkomentiraj linije ispod i dodaj secret SOURCE_PAT):
-          # SRC="https://x-access-token:${{ secrets.SOURCE_PAT }}@github.com/HJFTM"
-          # Ako su javni:
           SRC="https://github.com/HJFTM"
+          git clone --depth=1 --branch gh-pages "$SRC/uvod.git"      tmp/uvod
+          git clone --depth=1 --branch gh-pages "$SRC/bosna.git"     tmp/bosna
+          git clone --depth=1 --branch gh-pages "$SRC/stupnik.git"   tmp/stupnik
+          git clone --depth=1 --branch gh-pages "$SRC/dubrovnik.git" tmp/dubrovnik
 
-          declare -A MAP=( \
-            ["uvod"]="uvod" \
-            ["bosna"]="bosna" \
-            ["stupnik"]="stupnik" \
-            ["dubrovnik"]="dubrovnik" \
-          )
-
-          for repo in "${!MAP[@]}"; do
-            dir="${MAP[$repo]}"
-            echo ">>> Syncing $repo -> $dir/"
-            git clone --depth=1 --branch gh-pages "$SRC/$repo.git" "tmp/$repo"
-            rsync -avL --delete "tmp/$repo/" "$dir/"
+      # 6) Kopiraj SVE u JEDAN direktorij (root), bez .git i bez symlinkova
+      - name: Merge into flat gh-pages root
+        shell: bash
+        run: |
+          # redoslijed određuje tko prepisuje u slučaju kolizije pathova
+          for repo in uvod bosna stupnik dubrovnik; do
+            echo ">>> Merging $repo into root"
+            rsync -avL \
+              --exclude='.git' \
+              --exclude='.github' \
+              --exclude='.gitignore' \
+              --exclude='.gitattributes' \
+              --exclude='CNAME' \
+              --exclude='README.md' \
+              "tmp/$repo/" "./"
           done
-
           rm -rf tmp
 
-      # 6) Commit & push promjene u gh-pages
+      # 7) Commit & push
       - name: Commit & push
         shell: bash
         run: |
@@ -83,6 +91,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes."
           else
-            git commit -m "Sync gh-pages from uvod/bosna/stupnik/dubrovnik ($(date -u +%F_%T))"
+            git commit -m "Flat sync gh-pages (uvod/bosna/stupnik/dubrovnik) $(date -u +%F_%T)"
             git push origin gh-pages
           fi
