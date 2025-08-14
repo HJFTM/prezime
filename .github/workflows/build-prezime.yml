@@ -1,9 +1,7 @@
-name: Sync ONLY pages/ from uvod/bosna/stupnik/dubrovnik into gh-pages
+name: Sync ONLY pages/ from uvod/bosna/stupnik/dubrovnik into gh-pages subfolders
 
 on:
   workflow_dispatch:
-  schedule:
-    - cron: "15 3 * * *"  # dnevno u 03:15 UTC
 
 jobs:
   sync:
@@ -12,48 +10,53 @@ jobs:
       contents: write
 
     steps:
-      # 1) Checkout default branch (radi git konteksta i inicijalizacije)
+      # 1) Checkout default grane da možemo inicijalizirati gh-pages po potrebi
       - name: Checkout default branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2) Osiguraj da gh-pages postoji (prvi put kreira)
-      - name: Ensure gh-pages branch exists
+      # 2) Kreiraj gh-pages ako ne postoji
+      - name: Ensure gh-pages exists
         shell: bash
         run: |
           if ! git ls-remote --exit-code --heads origin gh-pages >/dev/null 2>&1; then
-            echo "gh-pages not found; creating…"
             git switch --orphan gh-pages
             git rm -r -f --ignore-unmatch * .[^.]* || true
-            echo "<!doctype html><meta charset=utf-8><title>prezime</title>" > index.html
+            echo "<!doctype html><title>prezime</title>" > index.html
             git -c user.name="GitHub Action" -c user.email="action@github.com" add -A
-            git -c user.name="GitHub Action" -c user.email="action@github.com" commit -m "Initialize gh-pages"
+            git -c user.name="GitHub Action" -c user.email="action@github.com" commit -m "init gh-pages"
             git push origin gh-pages
-          else
-            echo "gh-pages exists."
           fi
 
-      # 3) Radimo na gh-pages grani
-      - name: Checkout gh-pages
+      # 3) Checkout gh-pages kao radni dir
+      - name: Checkout gh-pages branch
         uses: actions/checkout@v4
         with:
           ref: gh-pages
+          fetch-depth: 0
 
-      # 4) Očisti samo ciljane podmape u destinaciji (ne diraj .git)
-      - name: Prepare target subfolders
+      # 4) Očisti ciljane podmape i ukloni moguće gitlinkove iz indexa
+      - name: Clean target subfolders and remove gitlinks
         shell: bash
         run: |
+          # Ukloni gitlinkove (submodule zapise) ako postoje
+          git ls-files -s | awk '$1=="160000"{print $4}' | while read p; do
+            echo "Removing gitlink from index: $p"
+            git rm -f --cached "$p" || true
+            rm -rf "$p" || true
+          done
+
+          # Čisti i kreiraj odredišta
           for d in Uvod Bosna Stupnik Dubrovnik; do
-            rm -rf "$d/pages"
+            rm -rf "$d"
             mkdir -p "$d/pages"
           done
+          rm -rf tmp
           mkdir -p tmp
 
-      # 5) Kloniraj IZVORE (grana gh-pages) u tmp/
-      #    Ako su privatni repoji, koristi PAT varijantu:
-      #    SRC="https://x-access-token:${{ secrets.SOURCE_PAT }}@github.com/HJFTM"
-      - name: Clone source repos (gh-pages)
+      # 5) Kloniraj izvore (grane gh-pages)
+      - name: Clone source repos
         shell: bash
         run: |
           SRC="https://github.com/HJFTM"
@@ -62,39 +65,34 @@ jobs:
           git clone --depth=1 --branch gh-pages "$SRC/stupnik.git"   tmp/stupnik
           git clone --depth=1 --branch gh-pages "$SRC/dubrovnik.git" tmp/dubrovnik
 
-      # 6) Kopiraj ISKLJUČIVO tmp/<repo>/pages/ u <Dest>/pages/
-      #    -L  : dereferenciraj symlinkove (kopiraj stvarne fajlove)
-      #    --exclude='.git*' i .github/... : ne povlači git/metu
-      - name: Sync pages/ only
+      # 6) EKSTRAHIRAJ SAMO pages/ BEZ .git (git archive → tar -x)
+      - name: Export pages/ into subfolders (no git metadata)
         shell: bash
         run: |
-          sync_pages () {
+          export_pages () {
             local src="$1" dest="$2"
-            if [ -d "$src/pages" ]; then
-              rsync -avL --delete \
-                --exclude='.git' --exclude='.git/**' \
-                --exclude='.github' --exclude='.github/**' \
-                --exclude='.gitignore' --exclude='.gitattributes' \
-                "$src/pages/" "$dest/pages/"
+            if git -C "tmp/$src" cat-file -e gh-pages:pages 2>/dev/null; then
+              # kreira tar s prefiksom "pages/" iz izvora, pa raspakira u destinaciju
+              git -C "tmp/$src" archive --format=tar gh-pages pages \
+                | tar -x -C "$dest"
             else
-              echo "WARN: $src/pages ne postoji – preskačem."
+              echo "WARN: tmp/$src nema 'pages/' na gh-pages – preskačem."
             fi
           }
 
-          sync_pages tmp/uvod      Uvod
-          sync_pages tmp/bosna     Bosna
-          sync_pages tmp/stupnik   Stupnik
-          sync_pages tmp/dubrovnik Dubrovnik
+          export_pages uvod      Uvod
+          export_pages bosna     Bosna
+          export_pages stupnik   Stupnik
+          export_pages dubrovnik Dubrovnik
 
           rm -rf tmp
 
-      # (opcionalno) Prikaži kratki diff u logu
-      - name: Debug diff summary
+      # (opcionalno) kratki pregled promjena
+      - name: Debug diff
         shell: bash
         run: |
-          echo "Broj promjena:"
-          git status --porcelain | wc -l | xargs echo
-          git status --porcelain | sed -n '1,200p'
+          echo "Changed files:"
+          git status --porcelain | sed -n '1,200p' || true
 
       # 7) Commit & push
       - name: Commit & push
@@ -106,6 +104,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes."
           else
-            git commit -m "Sync pages/ from uvod/bosna/stupnik/dubrovnik → Uvod|Bosna|Stupnik|Dubrovnik ($(date -u +%F_%T))"
+            git commit -m "Sync pages/ → Uvod|Bosna|Stupnik|Dubrovnik ($(date -u +%F_%T))"
             git push origin gh-pages
           fi
