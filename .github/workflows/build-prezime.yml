@@ -1,4 +1,4 @@
-name: Sync gh-pages from uvod/bosna/stupnik/dubrovnik into this repo (flat)
+name: Sync gh-pages into subfolders (Uvod/Bosna/Stupnik/Dubrovnik)
 
 on:
   workflow_dispatch:
@@ -12,13 +12,13 @@ jobs:
       contents: write
 
     steps:
-      # 1) Checkout default branch da možemo inicijalizirati gh-pages
+      # 1) Checkout default branch (radi git konteksta i inicijalizacije)
       - name: Checkout default branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2) Ako gh-pages ne postoji, kreiraj je
+      # 2) Kreiraj gh-pages ako ne postoji
       - name: Ensure gh-pages branch exists
         shell: bash
         run: |
@@ -34,52 +34,63 @@ jobs:
             echo "gh-pages exists."
           fi
 
-      # 3) Radimo na gh-pages
+      # 3) Radimo na gh-pages grani
       - name: Checkout gh-pages
         uses: actions/checkout@v4
         with:
           ref: gh-pages
 
-      # 4) Čisti start (NE briši .git)
-      - name: Clean gh-pages working tree
+      # 4) Očisti samo ciljane podmape (NE diraj .git i ostale fajlove)
+      - name: Prepare target subfolders
         shell: bash
         run: |
-          shopt -s dotglob
-          for p in *; do
-            if [ "$p" != ".git" ]; then
-              rm -rf "$p"
-            fi
+          for d in Uvod Bosna Stupnik Dubrovnik; do
+            rm -rf "$d"
+            mkdir -p "$d"
           done
           mkdir -p tmp
 
-      # 5) Kloniraj source gh-pages grane
-      #    Ako su privatni repoji, koristi PAT: https://x-access-token:${{ secrets.SOURCE_PAT }}@github.com/HJFTM/uvod.git
+      # 5) Kloniraj izvorne gh-pages grane
       - name: Clone source gh-pages
         shell: bash
         run: |
+          # Ako su repoji privatni, koristi PAT varijantu:
+          # SRC="https://x-access-token:${{ secrets.SOURCE_PAT }}@github.com/HJFTM"
           SRC="https://github.com/HJFTM"
           git clone --depth=1 --branch gh-pages "$SRC/uvod.git"      tmp/uvod
           git clone --depth=1 --branch gh-pages "$SRC/bosna.git"     tmp/bosna
           git clone --depth=1 --branch gh-pages "$SRC/stupnik.git"   tmp/stupnik
           git clone --depth=1 --branch gh-pages "$SRC/dubrovnik.git" tmp/dubrovnik
 
-      # 6) Kopiraj SVE u JEDAN direktorij (root), bez .git i bez symlinkova
-      - name: Merge into flat gh-pages root
+      # 6) Kopiraj sadržaj u odgovarajuće PODMAPE (dereference symlinks, isključi .git, .github…)
+      - name: Sync into subfolders
         shell: bash
         run: |
-          # redoslijed određuje tko prepisuje u slučaju kolizije pathova
-          for repo in uvod bosna stupnik dubrovnik; do
-            echo ">>> Merging $repo into root"
-            rsync -avL \
-              --exclude='.git' \
-              --exclude='.github' \
-              --exclude='.gitignore' \
-              --exclude='.gitattributes' \
-              --exclude='CNAME' \
-              --exclude='README.md' \
-              "tmp/$repo/" "./"
-          done
+          rsync -avL --delete \
+            --exclude='.git' --exclude='.github' --exclude='.gitignore' --exclude='.gitattributes' \
+            "tmp/uvod/"      "Uvod/"
+
+          rsync -avL --delete \
+            --exclude='.git' --exclude='.github' --exclude='.gitignore' --exclude='.gitattributes' \
+            "tmp/bosna/"     "Bosna/"
+
+          rsync -avL --delete \
+            --exclude='.git' --exclude='.github' --exclude='.gitignore' --exclude='.gitattributes' \
+            "tmp/stupnik/"   "Stupnik/"
+
+          rsync -avL --delete \
+            --exclude='.git' --exclude='.github' --exclude='.gitignore' --exclude='.gitattributes' \
+            "tmp/dubrovnik/" "Dubrovnik/"
+
           rm -rf tmp
+
+      # (opcionalno) Kratki pregled promjena u logu
+      - name: Debug diff summary
+        shell: bash
+        run: |
+          echo "Changed files count:"
+          git status --porcelain | wc -l | xargs echo
+          git status --porcelain | sed -n '1,200p'
 
       # 7) Commit & push
       - name: Commit & push
@@ -91,6 +102,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes."
           else
-            git commit -m "Flat sync gh-pages (uvod/bosna/stupnik/dubrovnik) $(date -u +%F_%T)"
+            git commit -m "Sync gh-pages into subfolders (Uvod/Bosna/Stupnik/Dubrovnik) $(date -u +%F_%T)"
             git push origin gh-pages
           fi
