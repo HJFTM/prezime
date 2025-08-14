@@ -1,15 +1,18 @@
 // FILE: main/scripts/generate-pdf-html.js
 // Run: node main/scripts/generate-pdf-html.js
+// Opis: Prolazi kroz sve pages/**/*.html na GH Pages sajtu i sprema odgovarajuće PDF-ove u gh-pages granu.
+
 import fs from "fs";
 import fsp from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
 import puppeteer from "puppeteer";
+import { setTimeout as delay } from "timers/promises";
 
 // ---------- Config iz ENV-a ----------
 const CURRENT_PROJECT =
   process.env.CURRENT_PROJECT ??
-  (process.env.GITHUB_REPOSITORY?.split("/")?.pop() ?? "uvod");
+  (process.env.GITHUB_REPOSITORY?.split("/")?.pop() ?? "uvod"); // npr. 'uvod', 'bosna', 'stupnik', 'dubrovnik'
 
 // Podrazumijevani host za GitHub Pages; možeš prebrisati s PUBLIC_HOST
 const PUBLIC_HOST = process.env.PUBLIC_HOST ?? "https://hjftm.github.io";
@@ -33,8 +36,11 @@ const PDF_MARGIN = {
   left: process.env.PDF_MARGIN_LEFT ?? "10mm",
 };
 
-// Timeout za page.goto
+// Timeout za navigaciju
 const NAV_TIMEOUT_MS = Number(process.env.NAV_TIMEOUT_MS ?? 120000);
+
+// Pauza nakon goto (ms)
+const POST_GOTO_DELAY_MS = Number(process.env.POST_GOTO_DELAY_MS ?? 500);
 
 // ---------- Helpers ----------
 const __filename = fileURLToPath(import.meta.url);
@@ -92,6 +98,8 @@ async function ensureDirForFile(filePath) {
   console.log("PAGES_DIR         :", localPagesRoot);
   console.log("APPEND_QUERY      :", APPEND_QUERY || "(none)");
   console.log("PDF format/margin :", PDF_FORMAT, PDF_MARGIN);
+  console.log("NAV_TIMEOUT_MS    :", NAV_TIMEOUT_MS);
+  console.log("POST_GOTO_DELAY   :", POST_GOTO_DELAY_MS, "ms");
 
   // 1) Provjere
   if (!fs.existsSync(absoluteGhPagesDir)) {
@@ -136,8 +144,14 @@ async function ensureDirForFile(filePath) {
         // Stabilniji network idle za dinamične stranice
         await page.goto(url, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
 
-        // Po želji: kratka pauza (npr. da se stilovi/render dovrše)
-        await page.waitForTimeout(500);
+        // Kratka pauza da se dovrši render (zamjena za page.waitForTimeout)
+        await delay(POST_GOTO_DELAY_MS);
+
+        // (Opcionalno) pričekaj da se 'load' završi, ako još nije
+        await page.evaluate(() => new Promise((resolve) => {
+          if (document.readyState === "complete") return resolve();
+          window.addEventListener("load", () => resolve(), { once: true });
+        }));
 
         await ensureDirForFile(outPdf);
         await page.pdf({
