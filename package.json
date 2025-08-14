@@ -1,0 +1,11 @@
+{
+  "name": "prezime-main",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "pdf:all": "node main/scripts/generate-pdf-html.js"
+  },
+  "dependencies": {
+    "puppeteer": "^22.15.0"
+  }
+}
