@@ -40,7 +40,7 @@ jobs:
         working-directory: main
 
       - name: Generate PDF
-        run: node main/hello-framework/scripts/generate-pdf.js
+        run: node main/scripts/generate-pdf.js
         env:
           OUTPUT_DIR: ../gh-pages/pdf
           CURRENT_PROJECT: ${{ env.CURRENT_PROJECT }}
