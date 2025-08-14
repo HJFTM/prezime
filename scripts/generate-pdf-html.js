@@ -1,121 +1,166 @@
-// FILE: generate-pdf.js
-import puppeteer from 'puppeteer';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+// FILE: main/scripts/generate-pdf-html.js
+// Run: node main/scripts/generate-pdf-html.js
+import fs from "fs";
+import fsp from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
+import puppeteer from "puppeteer";
 
+// ---------- Config iz ENV-a ----------
+const CURRENT_PROJECT =
+  process.env.CURRENT_PROJECT ??
+  (process.env.GITHUB_REPOSITORY?.split("/")?.pop() ?? "uvod");
+
+// Podrazumijevani host za GitHub Pages; možeš prebrisati s PUBLIC_HOST
+const PUBLIC_HOST = process.env.PUBLIC_HOST ?? "https://hjftm.github.io";
+
+// Gdje je checkout-an gh-pages branch u jobu (vidi workflow)
+const GH_PAGES_DIR = process.env.GH_PAGES_DIR ?? "gh-pages";
+
+// Relativna putanja kataloga s generiranim stranicama
+const PAGES_DIR = process.env.PAGES_DIR ?? "pages";
+
+// Opcionalni query koji želimo dodati na sve URL-ove (npr. "?ROD=Bosna")
+const APPEND_QUERY = process.env.APPEND_QUERY ?? "";
+
+// PDF postavke
+const PDF_FORMAT = process.env.PDF_FORMAT ?? "A4";
+const PDF_PRINT_BACKGROUND = (process.env.PDF_PRINT_BACKGROUND ?? "true") === "true";
+const PDF_MARGIN = {
+  top: process.env.PDF_MARGIN_TOP ?? "10mm",
+  right: process.env.PDF_MARGIN_RIGHT ?? "10mm",
+  bottom: process.env.PDF_MARGIN_BOTTOM ?? "12mm",
+  left: process.env.PDF_MARGIN_LEFT ?? "10mm",
+};
+
+// Timeout za page.goto
+const NAV_TIMEOUT_MS = Number(process.env.NAV_TIMEOUT_MS ?? 120000);
+
+// ---------- Helpers ----------
 const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const __dirname = path.dirname(__filename);
 
-// 1) Odredi BASE_URL projekta (hostano na GH Pages)
-const BASE_URL = 'https://hjftm.github.io/prezime';
+const absoluteGhPagesDir = path.resolve(__dirname, "..", "..", GH_PAGES_DIR);
+const localPagesRoot = path.join(absoluteGhPagesDir, PAGES_DIR);
+const baseUrl = `${PUBLIC_HOST}/${CURRENT_PROJECT}`;
 
-// 2) Gdje je lokalno COPY objavljenog sajta (gh-pages branch)?
-//    Možeš promijeniti putem SOURCE_DIR env var (apsolutna ili relativna putanja)
-const sourceDir = process.env.SOURCE_DIR
-  ? path.resolve(process.env.SOURCE_DIR)
-  : path.resolve(__dirname, '..', '..', 'gh-pages');
+function isHtmlFile(filePath) {
+  return filePath.toLowerCase().endsWith(".html");
+}
 
-// 3) Tražimo SAMO unutar "pages/" pod stabla objave
-const pagesDir = path.join(sourceDir, 'pages');
-
-// 4) Rekurzivno pokupi sve .html datoteke
-function walkHtmlFiles(dir) {
-  const results = [];
-  if (!fs.existsSync(dir)) return results;
-
-  const list = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of list) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      results.push(...walkHtmlFiles(full));
-    } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.html')) {
-      results.push(full);
+async function* walk(dir) {
+  const dirents = await fsp.readdir(dir, { withFileTypes: true });
+  for (const dirent of dirents) {
+    const res = path.resolve(dir, dirent.name);
+    if (dirent.isDirectory()) {
+      yield* walk(res);
+    } else {
+      yield res;
     }
   }
-  return results;
 }
 
-// 5) Pretvori lokalnu putanju datoteke u javni URL
-function filePathToUrl(filePath) {
-  // relativno prema ROOT-u (sourceDir), ne prema pagesDir — treba nam prefiks '/pages/...'
-  const relFromRoot = path.relative(sourceDir, filePath).split(path.sep).join('/');
-
-  // Ako je .../pages/foo/index.html → /pages/foo/
-  if (relFromRoot.endsWith('/index.html')) {
-    const withoutIndex = relFromRoot.slice(0, -'/index.html'.length);
-    return `${BASE_URL}/${withoutIndex}/`;
+function toPublicUrl(absoluteHtmlPath) {
+  // npr. absoluteHtmlPath = /.../gh-pages/pages/rodovi/bosna.html
+  // rel = pages/rodovi/bosna.html
+  const rel = path.relative(absoluteGhPagesDir, absoluteHtmlPath).split(path.sep).join("/"); // normalize
+  let url = `${baseUrl}/${rel}`;
+  if (APPEND_QUERY) {
+    // Ako već postoji upitnik, dodaj s '&', inače s '?'
+    url += (url.includes("?") ? "&" : "?") + APPEND_QUERY.replace(/^\?/, "");
   }
-
-  // Inače zadrži .html
-  return `${BASE_URL}/${relFromRoot}`;
+  return url;
 }
 
-// 6) Pripremi izlaz
-const outputDir = process.env.OUTPUT_DIR
-  ? path.resolve(__dirname, '..', '..', process.env.OUTPUT_DIR)
-  : path.join(__dirname, '..', 'public');
+function toPdfOutputPath(absoluteHtmlPath) {
+  const rel = path.relative(absoluteGhPagesDir, absoluteHtmlPath); // e.g. "pages/rodovi/bosna.html"
+  const relPdf = rel.replace(/\.html?$/i, ".pdf");                 // -> "pages/rodovi/bosna.pdf"
+  return path.join(absoluteGhPagesDir, relPdf);
+}
 
-if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+async function ensureDirForFile(filePath) {
+  const dir = path.dirname(filePath);
+  await fsp.mkdir(dir, { recursive: true });
+}
 
-const pdfFileName = `${CURRENT_PROJECT}.pdf`;
-const pdfPath = path.join(outputDir, pdfFileName);
-
-// 7) Sastavi listu URL‑ova iz filesystema
-const htmlFiles = walkHtmlFiles(pagesDir);
-
-// (Opcionalno) Filtriraj duplikate i sortiraj (index stranice prije dubokih, čisto radi konzistentnosti)
-const urls = Array.from(new Set(htmlFiles.map(filePathToUrl))).sort((a, b) => a.localeCompare(b));
-
+// ---------- Main ----------
 (async () => {
-  const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
-  const page = await browser.newPage();
+  console.log("=== generate-pdf-html.js ===");
+  console.log("Project           :", CURRENT_PROJECT);
+  console.log("PUBLIC_HOST       :", PUBLIC_HOST);
+  console.log("GH_PAGES_DIR      :", absoluteGhPagesDir);
+  console.log("PAGES_DIR         :", localPagesRoot);
+  console.log("APPEND_QUERY      :", APPEND_QUERY || "(none)");
+  console.log("PDF format/margin :", PDF_FORMAT, PDF_MARGIN);
 
-  let html = '<html><head><style>body{font-family:sans-serif}</style></head><body>';
-
-  for (const url of urls) {
-    try {
-      await page.goto(url, { waitUntil: 'networkidle0', timeout: 0 });
-
-      // Preferiraj <main>, ali ako ga nema, uzmi cijeli <body>
-      const hasMain = await page.$('main');
-      let chunk;
-      if (hasMain) {
-        chunk = await page.$eval('main', el => el.innerHTML);
-      } else {
-        chunk = await page.$eval('body', el => el.innerHTML);
-      }
-
-      html += `<div style="page-break-after: always;">${chunk}</div>`;
-      console.log(`✔ Dodano: ${url}`);
-    } catch (e) {
-      console.error(`❌ Greška pri ${url}: ${e.message}`);
-      html += `<div style="page-break-after: always;"><p>⚠️ Neuspješno dohvaćeno: ${url}</p></div>`;
-    }
+  // 1) Provjere
+  if (!fs.existsSync(absoluteGhPagesDir)) {
+    console.error(`Greška: GH_PAGES_DIR ne postoji: ${absoluteGhPagesDir}`);
+    process.exit(2);
+  }
+  if (!fs.existsSync(localPagesRoot)) {
+    console.error(`Greška: PAGES_DIR ne postoji: ${localPagesRoot}`);
+    process.exit(2);
   }
 
-  html += '</body></html>';
-  await page.setContent(html, { waitUntil: 'networkidle0' });
+  // 2) Skupi sve .html u pages/
+  const htmlFiles = [];
+  for await (const fp of walk(localPagesRoot)) {
+    if (isHtmlFile(fp)) htmlFiles.push(fp);
+  }
 
-  await page.pdf({
-    path: pdfPath,
-    format: 'A4',
-    printBackground: true,
-    displayHeaderFooter: true,
-    headerTemplate: `<div style="font-size:10px;width:100%;padding-right:10px;text-align:right;">${new Date().toLocaleString('hr-HR', { timeZone: 'Europe/Zagreb' })}</div>`,
-    footerTemplate: `<div style="font-size:10px;width:100%;text-align:center;"><span class="pageNumber"></span>/<span class="totalPages"></span></div>`,
-    margin: { top: '20mm', right: '20mm', bottom: '20mm', left: '20mm' }
+  if (htmlFiles.length === 0) {
+    console.warn("Upozorenje: Nema .html datoteka u 'pages/'.");
+    process.exit(0);
+  }
+
+  console.log(`Nađeno HTML datoteka: ${htmlFiles.length}`);
+
+  // 3) Puppeteer
+  const browser = await puppeteer.launch({
+    headless: "new",
+    args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
 
-  // 8) Kopiraj u gh-pages/pdf
-  const targetDir = path.resolve(__dirname, '..', '..', 'gh-pages', 'pdf');
-  const targetPath = path.join(targetDir, pdfFileName);
-  if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+  try {
+    for (let i = 0; i < htmlFiles.length; i++) {
+      const htmlAbs = htmlFiles[i];
+      const url = toPublicUrl(htmlAbs);
+      const outPdf = toPdfOutputPath(htmlAbs);
 
-  fs.copyFileSync(pdfPath, targetPath);
-  console.log(`📄 PDF kopiran u: ${targetPath}`);
+      console.log(`[${i + 1}/${htmlFiles.length}] PDF ->`, url);
+      const page = await browser.newPage();
+      try {
+        page.setDefaultNavigationTimeout(NAV_TIMEOUT_MS);
 
-  await browser.close();
-  console.log(`✅ PDF generiran: ${pdfPath}`);
-})();
+        // Stabilniji network idle za dinamične stranice
+        await page.goto(url, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
+
+        // Po želji: kratka pauza (npr. da se stilovi/render dovrše)
+        await page.waitForTimeout(500);
+
+        await ensureDirForFile(outPdf);
+        await page.pdf({
+          path: outPdf,
+          format: PDF_FORMAT,
+          printBackground: PDF_PRINT_BACKGROUND,
+          margin: PDF_MARGIN,
+        });
+
+        console.log("   ✔ Spremio:", path.relative(absoluteGhPagesDir, outPdf));
+      } catch (err) {
+        console.error("   ✖ Greška za URL:", url);
+        console.error(err?.stack || err?.message || String(err));
+      } finally {
+        await page.close().catch(() => {});
+      }
+    }
+  } finally {
+    await browser.close().catch(() => {});
+  }
+
+  console.log("Gotovo.");
+})().catch((e) => {
+  console.error("Fatal error:", e?.stack || e?.message || String(e));
+  process.exit(1);
+});
