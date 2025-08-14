@@ -1,4 +1,4 @@
-name: Sync gh-pages into subfolders (Uvod/Bosna/Stupnik/Dubrovnik)
+name: Sync ONLY pages/ from uvod/bosna/stupnik/dubrovnik into gh-pages
 
 on:
   workflow_dispatch:
@@ -18,7 +18,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 2) Kreiraj gh-pages ako ne postoji
+      # 2) Osiguraj da gh-pages postoji (prvi put kreira)
       - name: Ensure gh-pages branch exists
         shell: bash
         run: |
@@ -40,55 +40,59 @@ jobs:
         with:
           ref: gh-pages
 
-      # 4) Očisti samo ciljane podmape (NE diraj .git i ostale fajlove)
+      # 4) Očisti samo ciljane podmape u destinaciji (ne diraj .git)
       - name: Prepare target subfolders
         shell: bash
         run: |
           for d in Uvod Bosna Stupnik Dubrovnik; do
-            rm -rf "$d"
-            mkdir -p "$d"
+            rm -rf "$d/pages"
+            mkdir -p "$d/pages"
           done
           mkdir -p tmp
 
-      # 5) Kloniraj izvorne gh-pages grane
-      - name: Clone source gh-pages
+      # 5) Kloniraj IZVORE (grana gh-pages) u tmp/
+      #    Ako su privatni repoji, koristi PAT varijantu:
+      #    SRC="https://x-access-token:${{ secrets.SOURCE_PAT }}@github.com/HJFTM"
+      - name: Clone source repos (gh-pages)
         shell: bash
         run: |
-          # Ako su repoji privatni, koristi PAT varijantu:
-          # SRC="https://x-access-token:${{ secrets.SOURCE_PAT }}@github.com/HJFTM"
           SRC="https://github.com/HJFTM"
           git clone --depth=1 --branch gh-pages "$SRC/uvod.git"      tmp/uvod
           git clone --depth=1 --branch gh-pages "$SRC/bosna.git"     tmp/bosna
           git clone --depth=1 --branch gh-pages "$SRC/stupnik.git"   tmp/stupnik
           git clone --depth=1 --branch gh-pages "$SRC/dubrovnik.git" tmp/dubrovnik
 
-      # 6) Kopiraj sadržaj u odgovarajuće PODMAPE (dereference symlinks, isključi .git, .github…)
-      - name: Sync into subfolders
+      # 6) Kopiraj ISKLJUČIVO tmp/<repo>/pages/ u <Dest>/pages/
+      #    -L  : dereferenciraj symlinkove (kopiraj stvarne fajlove)
+      #    --exclude='.git*' i .github/... : ne povlači git/metu
+      - name: Sync pages/ only
         shell: bash
         run: |
-          rsync -avL --delete \
-            --exclude='.git' --exclude='.github' --exclude='.gitignore' --exclude='.gitattributes' \
-            "tmp/uvod/"      "Uvod/"
+          sync_pages () {
+            local src="$1" dest="$2"
+            if [ -d "$src/pages" ]; then
+              rsync -avL --delete \
+                --exclude='.git' --exclude='.git/**' \
+                --exclude='.github' --exclude='.github/**' \
+                --exclude='.gitignore' --exclude='.gitattributes' \
+                "$src/pages/" "$dest/pages/"
+            else
+              echo "WARN: $src/pages ne postoji – preskačem."
+            fi
+          }
 
-          rsync -avL --delete \
-            --exclude='.git' --exclude='.github' --exclude='.gitignore' --exclude='.gitattributes' \
-            "tmp/bosna/"     "Bosna/"
-
-          rsync -avL --delete \
-            --exclude='.git' --exclude='.github' --exclude='.gitignore' --exclude='.gitattributes' \
-            "tmp/stupnik/"   "Stupnik/"
-
-          rsync -avL --delete \
-            --exclude='.git' --exclude='.github' --exclude='.gitignore' --exclude='.gitattributes' \
-            "tmp/dubrovnik/" "Dubrovnik/"
+          sync_pages tmp/uvod      Uvod
+          sync_pages tmp/bosna     Bosna
+          sync_pages tmp/stupnik   Stupnik
+          sync_pages tmp/dubrovnik Dubrovnik
 
           rm -rf tmp
 
-      # (opcionalno) Kratki pregled promjena u logu
+      # (opcionalno) Prikaži kratki diff u logu
       - name: Debug diff summary
         shell: bash
         run: |
-          echo "Changed files count:"
+          echo "Broj promjena:"
           git status --porcelain | wc -l | xargs echo
           git status --porcelain | sed -n '1,200p'
 
@@ -102,6 +106,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No changes."
           else
-            git commit -m "Sync gh-pages into subfolders (Uvod/Bosna/Stupnik/Dubrovnik) $(date -u +%F_%T)"
+            git commit -m "Sync pages/ from uvod/bosna/stupnik/dubrovnik → Uvod|Bosna|Stupnik|Dubrovnik ($(date -u +%F_%T))"
             git push origin gh-pages
           fi
