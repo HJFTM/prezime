@@ -74,7 +74,7 @@ jobs:
         shell: bash
         run: |
           export_pages () {
-            local src="$1" dest="$2"
+            local src="$1" dest="."
             if git -C "tmp/$src" cat-file -e gh-pages:pages 2>/dev/null; then
               # kreira tar s prefiksom "pages/" iz izvora, pa raspakira u destinaciju
               git -C "tmp/$src" archive --format=tar gh-pages pages \
