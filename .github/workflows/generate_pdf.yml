@@ -1,24 +1,24 @@
 name: Generate PDFs for All Pages
 
 on:
-  workflow_dispatch:    # Ručno pokretanje
+  workflow_dispatch:          # Ručno pokretanje
   push:
     branches:
-      - main            # Pokreće se na push u main granu
+      - main                  # Pokreće se na push u main
 
 permissions:
-  contents: write       # Potrebno za commit/push
+  contents: write             # Potrebno za commit/push u gh-pages
 
 jobs:
   build-pdfs:
     runs-on: ubuntu-latest
 
     env:
-      CURRENT_PROJECT: ${{ vars.CURRENT_PROJECT }} # ili hardcode, npr. uvod
+      CURRENT_PROJECT: ${{ vars.CURRENT_PROJECT }}   # npr. uvod / bosna / stupnik / dubrovnik
       GH_PAGES_DIR: gh-pages
       PAGES_DIR: pages
       PUBLIC_HOST: https://hjftm.github.io
-      # APPEND_QUERY: "?ROD=Bosna"  # odkomentiraj po potrebi
+      # APPEND_QUERY: "?ROD=Bosna"  # po potrebi dodaj query svim URL-ovima
 
     steps:
       - name: Checkout main branch
@@ -38,9 +38,10 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Puppeteer
+      # Ako nemaš package-lock.json, koristi npm install (ne npm ci)
+      - name: Install dependencies
         working-directory: main
-        run: npm ci
+        run: npm install
 
       - name: Generate PDFs from all HTML files
         run: node main/scripts/generate-pdf-html.js
