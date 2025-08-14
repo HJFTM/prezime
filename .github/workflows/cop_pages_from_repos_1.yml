@@ -87,6 +87,13 @@ jobs:
                 | tar -x -C "$dest"
             fi
             
+            if git -C "tmp/$src" cat-file -e gh-pages:_file 2>/dev/null; then
+              # kreira tar s prefiksom "_file/" iz izvora, pa raspakira u destinaciju
+              git -C "tmp/$src" archive --format=tar gh-pages _file \
+                | tar -x -C "$dest"
+            fi
+            
+            
           }
 
           export_pages uvod      Uvod
