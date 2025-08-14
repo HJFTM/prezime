@@ -42,9 +42,9 @@ jobs:
       - name: Install dependencies
         working-directory: main
         run: npm install
-
-      - name: Generate PDFs from all HTML files
-        run: node main/scripts/generate-pdf-html.js
+      
+      - name: Generate ONE combined PDF
+        run: node main/scripts/generate-single-pdf.js
 
       - name: Commit and push generated PDFs
         working-directory: gh-pages
