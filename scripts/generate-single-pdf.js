@@ -1,7 +1,8 @@
 // FILE: main/scripts/generate-single-pdf.js
 // Run: node main/scripts/generate-single-pdf.js
-// Opis: Renderira sve pages/**/*.html, URL-ove poziva BEZ .html (clean URLs) uz .html fallback,
-//       i spaja sve u JEDAN PDF: <CURRENT_PROJECT>.pdf u gh-pages rootu.
+// Opis: Iz 'gh-pages/pages' rendere sve HTML-ove u više PDF-ova prema zadanim zadacima (name + patterns).
+//       Svaki zadatak filtrira ulazne stranice po "prefix" uzorcima (npr. "pages/ENTITET/matica*").
+//       Header: lijevo URL, desno "Page X / Y".
 
 import fs from "fs";
 import fsp from "fs/promises";
@@ -24,7 +25,7 @@ const PAGES_DIR = process.env.PAGES_DIR ?? "pages";
 const PDF_FORMAT = process.env.PDF_FORMAT ?? "A4";
 const PDF_PRINT_BACKGROUND = (process.env.PDF_PRINT_BACKGROUND ?? "true") === "true";
 const PDF_MARGIN = {
-  top: process.env.PDF_MARGIN_TOP ?? "15mm", // malo veći gornji margin za header
+  top: process.env.PDF_MARGIN_TOP ?? "15mm", // veći gornji margin zbog headera
   right: process.env.PDF_MARGIN_RIGHT ?? "10mm",
   bottom: process.env.PDF_MARGIN_BOTTOM ?? "12mm",
   left: process.env.PDF_MARGIN_LEFT ?? "10mm",
@@ -38,13 +39,39 @@ const POST_GOTO_DELAY_MS = Number(process.env.POST_GOTO_DELAY_MS ?? 500);
 const SORT_INPUT = (process.env.SORT_INPUT ?? "true") === "true";
 const PAGES_PER_TAB = Number(process.env.PAGES_PER_TAB ?? 120);
 
+const PDF_TASKS = [
+  { name: "koncept.pdf",  pages: ["pages/KONCEPT*"] },
+  { name: "rod.pdf",      pages: ["pages/ROD*"] },  
+  { name: "matice.pdf",   pages: ["pages/ENTITET/matica*"] },
+  { name: "mjesto.pdf",   pages: ["pages/ENTITET/mjesto*"] },
+  { name: "obitelj.pdf",  pages: ["pages/ENTITET/obitelj*"] },
+  { name: "zupa.pdf",     pages: ["pages/ENTITET/zupa*"] },  
+];
+
+// Zadaci (može i preko env varijable PDF_TASKS_JSON = '[{"name":"matice.pdf","pages":["pages/ENTITET/matica*"]}]')
+const PDF_TASKS_xx = (() => {
+  if (process.env.PDF_TASKS_JSON) {
+    try {
+      return JSON.parse(process.env.PDF_TASKS_JSON);
+    } catch (e) {
+      console.warn("⚠ Nevažeći PDF_TASKS_JSON, koristim lokalnu konstantu. Greška:", e?.message || e);
+    }
+  }
+  // ➜ Primjeri (po potrebi mijenjaj):
+  return [
+    // Sve stranice (kao fallback primjer)
+    { name: `${CURRENT_PROJECT}.pdf`, pages: ["pages/"] },
+    // Primjer filtriranog PDF-a
+    // { name: "matice.pdf", pages: ["pages/ENTITET/matica*"] },
+  ];
+})();
+
 // ---------- Helpers ----------
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const absoluteGhPagesDir = path.resolve(__dirname, "..", "..", GH_PAGES_DIR);
 const localPagesRoot = path.join(absoluteGhPagesDir, PAGES_DIR);
 const baseUrl = `${PUBLIC_HOST}/${CURRENT_PROJECT}`;
-const outSinglePdf = path.join(absoluteGhPagesDir, `${CURRENT_PROJECT}.pdf`);
 
 function isHtmlFile(filePath) {
   return filePath.toLowerCase().endsWith(".html");
@@ -63,33 +90,121 @@ async function* walk(dir) {
 }
 
 function toExtensionlessPublicUrl(absoluteHtmlPath) {
-  const rel = path.relative(absoluteGhPagesDir, absoluteHtmlPath).split(path.sep).join("/");
+  const rel = path
+    .relative(absoluteGhPagesDir, absoluteHtmlPath)
+    .split(path.sep)
+    .join("/");
   let extlessPath;
   if (rel.toLowerCase().endsWith("/index.html")) {
-    extlessPath = rel.slice(0, -("index.html".length));  // "pages/foo/"
+    extlessPath = rel.slice(0, -("index.html".length)); // "pages/foo/"
   } else {
-    extlessPath = rel.replace(/\.html?$/i, "");          // "pages/abc/def"
+    extlessPath = rel.replace(/\.html?$/i, ""); // "pages/abc/def"
   }
   const url = `${baseUrl}/${extlessPath}`.replace(/\/{2,}/g, "/");
   return encodeURI(url);
 }
 
 function toHtmlPublicUrl(absoluteHtmlPath) {
-  const rel = path.relative(absoluteGhPagesDir, absoluteHtmlPath).split(path.sep).join("/");
+  const rel = path
+    .relative(absoluteGhPagesDir, absoluteHtmlPath)
+    .split(path.sep)
+    .join("/");
   const url = `${baseUrl}/${rel}`.replace(/\/{2,}/g, "/");
   return encodeURI(url);
 }
 
+// Jednostavni "prefix" matcher: pattern s '*' znači "počinje s <prefix>"
+function matchesAnyPattern(relPath, patterns = []) {
+  if (!patterns.length) return false;
+  for (const raw of patterns) {
+    if (!raw) continue;
+    const pat = raw.replace(/\\/g, "/"); // normaliziraj
+    if (pat.endsWith("*")) {
+      const prefix = pat.slice(0, -1);
+      if (relPath.startsWith(prefix)) return true;
+    } else {
+      // točno ovaj prefix
+      if (relPath.startsWith(pat)) return true;
+    }
+  }
+  return false;
+}
+
+// Render jedne HTML stranice u PDF bytes (s headerom)
+async function renderHtmlToPdfBytes(page, urlPrimary, urlFallback) {
+  let loaded = false;
+  let activeUrl = "";
+
+  try {
+    const resp = await page.goto(urlPrimary, {
+      waitUntil: "networkidle2",
+      timeout: NAV_TIMEOUT_MS,
+    });
+    if (!resp || !resp.ok()) throw new Error(`HTTP status ${resp?.status?.() ?? "unknown"} on clean URL`);
+    loaded = true;
+    activeUrl = urlPrimary;
+  } catch (e1) {
+    console.warn(`   ⚠ Clean URL nije uspio, probam .html: ${e1?.message || e1}`);
+    try {
+      const resp2 = await page.goto(urlFallback, {
+        waitUntil: "networkidle2",
+        timeout: NAV_TIMEOUT_MS,
+      });
+      if (!resp2 || !resp2.ok()) throw new Error(`HTTP status ${resp2?.status?.() ?? "unknown"} on .html URL`);
+      loaded = true;
+      activeUrl = urlFallback;
+    } catch (e2) {
+      console.error("   ✖ Greška (oba URL-a):", e2?.stack || e2?.message || String(e2));
+    }
+  }
+
+  if (!loaded) return null;
+
+  await delay(POST_GOTO_DELAY_MS);
+  await page.evaluate(
+    () =>
+      new Promise((resolve) => {
+        if (document.readyState === "complete") return resolve();
+        window.addEventListener("load", () => resolve(), { once: true });
+      })
+  );
+
+  const headerHtml = `
+    <div style="font-size:8px;
+                width:100%;
+                padding:0 5mm;
+                display:flex;
+                justify-content:space-between;
+                color:#555;
+                font-family:sans-serif;">
+      <span>${activeUrl}</span>
+      <span class="pageNumber"></span> / <span class="totalPages"></span>
+    </div>`;
+
+  const pdfBytes = await page.pdf({
+    path: undefined,
+    format: PDF_FORMAT,
+    printBackground: PDF_PRINT_BACKGROUND,
+    margin: PDF_MARGIN,
+    displayHeaderFooter: true,
+    headerTemplate: headerHtml,
+    footerTemplate: "<div></div>",
+  });
+
+  return pdfBytes;
+}
+
 // ---------- Main ----------
 (async () => {
-  console.log("=== generate-single-pdf.js ===");
+  console.log("=== generate-single-pdf.js (multi-output) ===");
   console.log("Project           :", CURRENT_PROJECT);
   console.log("PUBLIC_HOST       :", PUBLIC_HOST);
-  console.log("GH_PAGES_DIR      :", absoluteGhPagesDir);
-  console.log("PAGES_DIR         :", localPagesRoot);
+  console.log("GH_PAGES_DIR      :", path.resolve(absoluteGhPagesDir));
+  console.log("PAGES_DIR         :", path.resolve(localPagesRoot));
   console.log("PDF format/margin :", PDF_FORMAT, PDF_MARGIN);
   console.log("NAV_TIMEOUT_MS    :", NAV_TIMEOUT_MS);
   console.log("POST_GOTO_DELAY   :", POST_GOTO_DELAY_MS, "ms");
+  console.log("TASKS             :", JSON.stringify(PDF_TASKS, null, 2));
 
   if (!fs.existsSync(absoluteGhPagesDir)) {
     console.error(`Greška: GH_PAGES_DIR ne postoji: ${absoluteGhPagesDir}`);
@@ -100,114 +215,86 @@ function toHtmlPublicUrl(absoluteHtmlPath) {
     process.exit(2);
   }
 
-  // Skupi sve .html
-  const htmlFiles = [];
+  // 1) Skupi sve .html (apsolutne putanje) + pripremi relPath
+  const allHtmlAbs = [];
   for await (const fp of walk(localPagesRoot)) {
-    if (isHtmlFile(fp)) htmlFiles.push(fp);
+    if (isHtmlFile(fp)) allHtmlAbs.push(fp);
   }
-  if (htmlFiles.length === 0) {
+  if (allHtmlAbs.length === 0) {
     console.warn("Upozorenje: Nema .html datoteka u 'pages/'.");
     process.exit(0);
   }
-  if (SORT_INPUT) htmlFiles.sort((a, b) => a.localeCompare(b));
+  if (SORT_INPUT) allHtmlAbs.sort((a, b) => a.localeCompare(b));
 
-  console.log(`Nađeno HTML datoteka: ${htmlFiles.length}`);
-  console.log(`Izlazni PDF         : ${outSinglePdf}`);
-
-  // Finalni PDF
-  const finalDoc = await PDFDocument.create();
-
-  // Puppeteer
+  // 2) Pupeteer browser
   const browser = await puppeteer.launch({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
-
   let page = await browser.newPage();
   page.setDefaultNavigationTimeout(NAV_TIMEOUT_MS);
 
   try {
-    for (let i = 0; i < htmlFiles.length; i++) {
-      if (i > 0 && i % PAGES_PER_TAB === 0) {
-        try { await page.close(); } catch {}
-        page = await browser.newPage();
-        page.setDefaultNavigationTimeout(NAV_TIMEOUT_MS);
+    // 3) Obradi svaki zadatak
+    for (const task of PDF_TASKS) {
+      const outPdfPath = path.join(absoluteGhPagesDir, task.name);
+      const patterns = Array.isArray(task.pages) ? task.pages.map(p => p.replace(/\\/g, "/")) : [];
+
+      // Filtriraj fajlove po patternima
+      const taskFiles = allHtmlAbs.filter(abs => {
+        const rel = path.relative(absoluteGhPagesDir, abs).split(path.sep).join("/");
+        return matchesAnyPattern(rel, patterns);
+      });
+
+      if (!taskFiles.length) {
+        console.warn(`⚠ Zadatak "${task.name}": nema pogodaka za patterns = ${JSON.stringify(patterns)}`);
+        continue;
       }
 
-      const htmlAbs = htmlFiles[i];
-      const urlPrimary = toExtensionlessPublicUrl(htmlAbs);
-      const urlFallback = toHtmlPublicUrl(htmlAbs);
+      console.log(`\n— ZADATAK: ${task.name}`);
+      console.log(`   • Broj ulaznih HTML-ova: ${taskFiles.length}`);
+      console.log(`   • Patterni: ${JSON.stringify(patterns)}`);
+      console.log(`   • Output: ${outPdfPath}`);
 
-      console.log(`[${i + 1}/${htmlFiles.length}] Render (clean URL) -> ${urlPrimary}`);
+      const finalDoc = await PDFDocument.create();
 
-      let loaded = false;
-      let activeUrl = "";
-      try {
-        const resp = await page.goto(urlPrimary, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
-        if (!resp || !resp.ok()) throw new Error(`HTTP status ${resp?.status?.() ?? "unknown"} on clean URL`);
-        loaded = true;
-        activeUrl = urlPrimary;
-      } catch (e1) {
-        console.warn(`   ⚠ Clean URL nije uspio, probam .html: ${e1?.message || e1}`);
+      for (let i = 0; i < taskFiles.length; i++) {
+        if (i > 0 && i % PAGES_PER_TAB === 0) {
+          try { await page.close(); } catch {}
+          page = await browser.newPage();
+          page.setDefaultNavigationTimeout(NAV_TIMEOUT_MS);
+        }
+
+        const htmlAbs = taskFiles[i];
+        const urlPrimary = toExtensionlessPublicUrl(htmlAbs);
+        const urlFallback = toHtmlPublicUrl(htmlAbs);
+
+        console.log(`   [${i + 1}/${taskFiles.length}] Render -> ${urlPrimary}`);
+
         try {
-          console.log(`   → Fallback (.html) -> ${urlFallback}`);
-          const resp2 = await page.goto(urlFallback, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
-          if (!resp2 || !resp2.ok()) throw new Error(`HTTP status ${resp2?.status?.() ?? "unknown"} on .html URL`);
-          loaded = true;
-          activeUrl = urlFallback;
-        } catch (e2) {
-          console.error("   ✖ Greška (oba URL-a):", e2?.stack || e2?.message || String(e2));
+          const pdfBytes = await renderHtmlToPdfBytes(page, urlPrimary, urlFallback);
+          if (!pdfBytes) {
+            console.error("      ✖ Preskačem zbog greške pri učitavanju.");
+            continue;
+          }
+          const srcDoc = await PDFDocument.load(pdfBytes);
+          const srcPages = await finalDoc.copyPages(srcDoc, srcDoc.getPageIndices());
+          srcPages.forEach(p => finalDoc.addPage(p));
+        } catch (err) {
+          console.error("      ✖ Greška tijekom render/merge:", err?.stack || err?.message || String(err));
         }
       }
 
-      if (!loaded) continue;
-
-      try {
-        await delay(POST_GOTO_DELAY_MS);
-        await page.evaluate(() => new Promise((resolve) => {
-          if (document.readyState === "complete") return resolve();
-          window.addEventListener("load", () => resolve(), { once: true });
-        }));
-
-        // Header HTML
-        const headerHtml = `
-          <div style="font-size:8px;
-                      width:100%;
-                      padding:0 5mm;
-                      display:flex;
-                      justify-content:space-between;
-                      color:#555;
-                      font-family:sans-serif;">
-            <span>${activeUrl}</span>
-            <span class="pageNumber"></span> / <span class="totalPages"></span>
-          </div>`;
-
-        const pdfBytes = await page.pdf({
-          path: undefined,
-          format: PDF_FORMAT,
-          printBackground: PDF_PRINT_BACKGROUND,
-          margin: PDF_MARGIN,
-          displayHeaderFooter: true,
-          headerTemplate: headerHtml,
-          footerTemplate: "<div></div>",
-        });
-
-        const srcDoc = await PDFDocument.load(pdfBytes);
-        const srcPages = await finalDoc.copyPages(srcDoc, srcDoc.getPageIndices());
-        srcPages.forEach((p) => finalDoc.addPage(p));
-
-      } catch (err) {
-        console.error("   ✖ Greška tijekom render/merge:", err?.stack || err?.message || String(err));
-      }
+      const finalBytes = await finalDoc.save();
+      await fsp.writeFile(outPdfPath, finalBytes);
+      console.log(`   ✔ Završeno: ${outPdfPath}`);
     }
   } finally {
     try { await page.close(); } catch {}
     await browser.close().catch(() => {});
   }
 
-  const finalBytes = await finalDoc.save();
-  await fsp.writeFile(outSinglePdf, finalBytes);
-  console.log("✔ Gotov jedinstveni PDF:", outSinglePdf);
+  console.log("✔ Svi zadaci obrađeni.");
 })().catch((e) => {
   console.error("Fatal error:", e?.stack || e?.message || String(e));
   process.exit(1);
