@@ -24,7 +24,7 @@ const PAGES_DIR = process.env.PAGES_DIR ?? "pages";
 const PDF_FORMAT = process.env.PDF_FORMAT ?? "A4";
 const PDF_PRINT_BACKGROUND = (process.env.PDF_PRINT_BACKGROUND ?? "true") === "true";
 const PDF_MARGIN = {
-  top: process.env.PDF_MARGIN_TOP ?? "10mm",
+  top: process.env.PDF_MARGIN_TOP ?? "15mm", // malo veći gornji margin za header
   right: process.env.PDF_MARGIN_RIGHT ?? "10mm",
   bottom: process.env.PDF_MARGIN_BOTTOM ?? "12mm",
   left: process.env.PDF_MARGIN_LEFT ?? "10mm",
@@ -141,10 +141,12 @@ function toHtmlPublicUrl(absoluteHtmlPath) {
       console.log(`[${i + 1}/${htmlFiles.length}] Render (clean URL) -> ${urlPrimary}`);
 
       let loaded = false;
+      let activeUrl = "";
       try {
         const resp = await page.goto(urlPrimary, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
         if (!resp || !resp.ok()) throw new Error(`HTTP status ${resp?.status?.() ?? "unknown"} on clean URL`);
         loaded = true;
+        activeUrl = urlPrimary;
       } catch (e1) {
         console.warn(`   ⚠ Clean URL nije uspio, probam .html: ${e1?.message || e1}`);
         try {
@@ -152,6 +154,7 @@ function toHtmlPublicUrl(absoluteHtmlPath) {
           const resp2 = await page.goto(urlFallback, { waitUntil: "networkidle2", timeout: NAV_TIMEOUT_MS });
           if (!resp2 || !resp2.ok()) throw new Error(`HTTP status ${resp2?.status?.() ?? "unknown"} on .html URL`);
           loaded = true;
+          activeUrl = urlFallback;
         } catch (e2) {
           console.error("   ✖ Greška (oba URL-a):", e2?.stack || e2?.message || String(e2));
         }
@@ -166,11 +169,27 @@ function toHtmlPublicUrl(absoluteHtmlPath) {
           window.addEventListener("load", () => resolve(), { once: true });
         }));
 
+        // Header HTML
+        const headerHtml = `
+          <div style="font-size:8px;
+                      width:100%;
+                      padding:0 5mm;
+                      display:flex;
+                      justify-content:space-between;
+                      color:#555;
+                      font-family:sans-serif;">
+            <span>${activeUrl}</span>
+            <span class="pageNumber"></span> / <span class="totalPages"></span>
+          </div>`;
+
         const pdfBytes = await page.pdf({
           path: undefined,
           format: PDF_FORMAT,
           printBackground: PDF_PRINT_BACKGROUND,
           margin: PDF_MARGIN,
+          displayHeaderFooter: true,
+          headerTemplate: headerHtml,
+          footerTemplate: "<div></div>",
         });
 
         const srcDoc = await PDFDocument.load(pdfBytes);
