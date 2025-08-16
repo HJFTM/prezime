@@ -1,4 +1,4 @@
-name: Generate & Compress Single PDF
+name: Generate & Publish PDFs (tasks + final)
 
 on:
   workflow_dispatch:
@@ -9,14 +9,30 @@ permissions:
   contents: write
 
 jobs:
-  build-single-pdf:
+  build-pdfs:
     runs-on: ubuntu-latest
 
     env:
-      CURRENT_PROJECT: ${{ vars.CURRENT_PROJECT }}   # npr. uvod / bosna / stupnik / dubrovnik
+      CURRENT_PROJECT: ${{ vars.CURRENT_PROJECT }}      # uvod / bosna / stupnik / dubrovnik
       GH_PAGES_DIR: gh-pages
       PAGES_DIR: pages
       PUBLIC_HOST: https://hjftm.github.io
+
+      # ▶︎ Nova okolina za skriptu:
+      FINAL_PDF_NAME: prezime.pdf        # kako želiš da se zove finalni PDF
+      FINAL_COMPRESS: "true"             # skripta koristi Ghostscript ako postoji
+      GS_QUALITY: "/ebook"               # /screen /ebook /printer /prepress
+
+      # (po želji predefiniraj zadatke preko JSON-a)
+      # PDF_TASKS_JSON: >-
+      #   [
+      #     {"name":"koncept.pdf","pages":["pages/KONCEPT*"]},
+      #     {"name":"rod.pdf","pages":["pages/ROD*"]},
+      #     {"name":"matice.pdf","pages":["pages/ENTITET/matica*"]},
+      #     {"name":"mjesto.pdf","pages":["pages/ENTITET/mjesto*"]},
+      #     {"name":"obitelj.pdf","pages":["pages/ENTITET/obitelj*"]},
+      #     {"name":"zupa.pdf","pages":["pages/ENTITET/zupa*"]}
+      #   ]
 
     steps:
       - name: Checkout main
@@ -38,84 +54,51 @@ jobs:
 
       - name: Install dependencies
         working-directory: main
-        run: npm install
+        run: npm ci || npm install
 
-      - name: Generate ONE combined PDF
-        run: node main/scripts/generate-single-pdf.js
-
-      - name: Compress final PDF to < 100 MB
+      # Ako želiš da skripta radi kompresiju finala, treba GS
+      - name: Install Ghostscript (for in-script compression)
         run: |
           sudo apt-get update
           sudo apt-get install -y ghostscript
-          cd gh-pages
-          IN="${{ env.CURRENT_PROJECT }}.pdf"
-          if [ ! -f "$IN" ]; then
-            echo "ERROR: $IN not found in gh-pages"; ls -la; exit 1
-          fi
 
-          TARGET=100000000
-          OUT="${IN%.pdf}.min.pdf"
+      - name: Generate all task PDFs + final merged PDF
+        run: node main/scripts/generate-single-pdf.js
 
-          echo "Initial size:"
-          ls -lh "$IN"
+      - name: Show produced PDFs
+        run: |
+          echo "PDFs in gh-pages:"
+          ls -lh gh-pages/*.pdf || true
 
-          # Pass 1: /ebook (često dovoljno)
-          gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook \
-             -dNOPAUSE -dBATCH -dQUIET \
-             -sOutputFile="$OUT" "$IN"
-          size=$(stat -c%s "$OUT")
-          echo "After /ebook: $((size/1024/1024)) MB"
+      # ── VARIJANTA B (opcionalno): dodatna kompresija samo finala nakon skripte ──
+      # - name: Extra compress final to <100 MB (optional)
+      #   run: |
+      #     cd gh-pages
+      #     IN="${{ env.FINAL_PDF_NAME }}"
+      #     if [ ! -f "$IN" ]; then
+      #       echo "ERROR: $IN not found in gh-pages"; ls -la; exit 1
+      #     fi
+      #     TARGET=100000000
+      #     OUT="${IN%.pdf}.min.pdf"
+      #     echo "Initial size:"; ls -lh "$IN"
+      #     gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook \
+      #        -dNOPAUSE -dBATCH -dQUIET \
+      #        -sOutputFile="$OUT" "$IN"
+      #     size=$(stat -c%s "$OUT")
+      #     echo "After /ebook: $((size/1024/1024)) MB"
+      #     if [ "$size" -ge "$TARGET" ]; then
+      #       gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen \
+      #          -dNOPAUSE -dBATCH -dQUIET \
+      #          -sOutputFile="$OUT" "$IN"
+      #     fi
+      #     mv -f "$OUT" "$IN"
+      #     echo "Final size:"; ls -lh "$IN"
 
-          # Pass 2: /screen (agresivnije)
-          if [ "$size" -ge "$TARGET" ]; then
-            echo "Recompress with /screen..."
-            gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen \
-               -dNOPAUSE -dBATCH -dQUIET \
-               -sOutputFile="$OUT" "$IN"
-            size=$(stat -c%s "$OUT")
-            echo "After /screen: $((size/1024/1024)) MB"
-          fi
-
-          # Pass 3: custom 96 dpi
-          if [ "$size" -ge "$TARGET" ]; then
-            echo "Recompress with custom 96dpi..."
-            gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 \
-               -dDownsampleColorImages=true -dColorImageDownsampleType=/Bicubic -dColorImageResolution=96 \
-               -dDownsampleGrayImages=true  -dGrayImageDownsampleType=/Bicubic  -dGrayImageResolution=96 \
-               -dDownsampleMonoImages=true  -dMonoImageDownsampleType=/Subsample -dMonoImageResolution=300 \
-               -dNOPAUSE -dBATCH -dQUIET \
-               -sOutputFile="$OUT" "$IN"
-            size=$(stat -c%s "$OUT")
-            echo "After 96dpi: $((size/1024/1024)) MB"
-          fi
-
-          # Pass 4: custom 72 dpi (zadnja mjera)
-          if [ "$size" -ge "$TARGET" ]; then
-            echo "Recompress with custom 72dpi..."
-            gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 \
-               -dDownsampleColorImages=true -dColorImageDownsampleType=/Bicubic -dColorImageResolution=72 \
-               -dDownsampleGrayImages=true  -dGrayImageDownsampleType=/Bicubic  -dGrayImageResolution=72 \
-               -dDownsampleMonoImages=true  -dMonoImageDownsampleType=/Subsample -dMonoImageResolution=300 \
-               -dNOPAUSE -dBATCH -dQUIET \
-               -sOutputFile="$OUT" "$IN"
-            size=$(stat -c%s "$OUT")
-            echo "After 72dpi: $((size/1024/1024)) MB"
-          fi
-
-          # Zamijeni original komprimiranim
-          mv -f "$OUT" "$IN"
-          echo "Final size:"
-          ls -lh "$IN"
-
-          if [ $(stat -c%s "$IN") -ge "$TARGET" ]; then
-            echo "WARNING: Compressed PDF is still >= 100MB; push may fail."
-          fi
-
-      - name: Commit & push compressed PDF
+      - name: Commit & push ALL PDFs
         working-directory: gh-pages
         run: |
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
-          git add "${{ env.CURRENT_PROJECT }}.pdf"
-          git commit -m "Update compressed ${{ env.CURRENT_PROJECT }}.pdf ($(date +'%Y-%m-%d_%H:%M:%S'))" || echo "No changes to commit"
+          git add *.pdf
+          git commit -m "Update PDFs ($(date +'%Y-%m-%d_%H:%M:%S'))" || echo "No changes to commit"
           git push origin gh-pages
