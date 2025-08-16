@@ -2,7 +2,7 @@
 # uključiti foldere i podfoldere: gh-pages/_file, gh-pages/_npm, gh-pages/_observablehq, gh-pages/pages
 # ? pretvoriti linkove?
 
-name: Copy 2
+name: Copy gh-pages from Uvod, Bosna, Stupnik, Dubrovnik
 
 on:
   workflow_dispatch:
