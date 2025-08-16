@@ -1,0 +1,68 @@
+name: Merge all gh-pages/pages* from subprojects
+
+on:
+  workflow_dispatch:
+
+jobs:
+  merge-pages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      PROJECTS: "uvod bosna stupnik dubrovnik"
+
+    steps:
+      - name: Ensure gh-pages exists
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+
+      - name: Clean old pages
+        shell: bash
+        run: |
+          rm -rf pages
+          mkdir -p pages
+
+      - name: Clone sources
+        shell: bash
+        run: |
+          SRC="https://github.com/HJFTM"
+          rm -rf tmp && mkdir -p tmp
+          for R in $PROJECTS; do
+            git clone --depth=1 --branch gh-pages "$SRC/$R.git" "tmp/$R"
+          done
+
+      - name: Merge pages/* from all projects
+        shell: bash
+        run: |
+          sudo apt-get update -y && sudo apt-get install -y rsync >/dev/null
+          for R in $PROJECTS; do
+            # sve što počinje sa pages (pages, pages-xyz, pages_something…)
+            for P in tmp/$R/pages*; do
+              if [ -d "$P" ]; then
+                echo "Merging $P -> pages/ (no overwrite of existing files)"
+                rsync -a --ignore-existing "$P/" pages/
+              fi
+            done
+          done
+          rm -rf tmp
+
+      - name: Debug diff
+        shell: bash
+        run: |
+          echo "Changed files:"
+          git status --porcelain | sed -n '1,200p' || true
+
+      - name: Commit & push
+        shell: bash
+        run: |
+          git config user.name "GitHub Action"
+          git config user.email "action@github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes."
+          else
+            git commit -m "Merge all pages/* from uvod|bosna|stupnik|dubrovnik ($(date -u +%F_%T))"
+            git push origin gh-pages
+          fi
