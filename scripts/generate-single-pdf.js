@@ -1,7 +1,8 @@
 // FILE: main/scripts/generate-single-pdf.js
 // Run: node main/scripts/generate-single-pdf.js
-// Opis: Iz 'gh-pages/pages' rendere sve HTML-ove u više PDF-ova prema zadanim zadacima (name + patterns).
-//       Svaki zadatak filtrira ulazne stranice po "prefix" uzorcima (npr. "pages/ENTITET/matica*").
+// Opis: Rendere više PDF-ova prema zadanim zadacima (name + patterns),
+//       svaki PDF se snimi posebno, a zatim se svi spoje u jedan
+//       konačni (npr. "prezime.pdf") i po potrebi komprimiraju.
 //       Header: lijevo URL, desno "Page X / Y".
 
 import fs from "fs";
@@ -11,6 +12,10 @@ import { fileURLToPath } from "url";
 import puppeteer from "puppeteer";
 import { setTimeout as delay } from "timers/promises";
 import { PDFDocument } from "pdf-lib";
+import { exec as _exec } from "child_process";
+import { promisify } from "util";
+
+const exec = promisify(_exec);
 
 // ---------- Config ----------
 const CURRENT_PROJECT =
@@ -39,17 +44,13 @@ const POST_GOTO_DELAY_MS = Number(process.env.POST_GOTO_DELAY_MS ?? 500);
 const SORT_INPUT = (process.env.SORT_INPUT ?? "true") === "true";
 const PAGES_PER_TAB = Number(process.env.PAGES_PER_TAB ?? 120);
 
-const PDF_TASKS = [
-  { name: "koncept.pdf",  pages: ["pages/KONCEPT*"] },
-  { name: "rod.pdf",      pages: ["pages/ROD*"] },  
-  { name: "matice.pdf",   pages: ["pages/ENTITET/matica*"] },
-  { name: "mjesto.pdf",   pages: ["pages/ENTITET/mjesto*"] },
-  { name: "obitelj.pdf",  pages: ["pages/ENTITET/obitelj*"] },
-  { name: "zupa.pdf",     pages: ["pages/ENTITET/zupa*"] },  
-];
+// Finalni spojeni PDF + kompresija
+const FINAL_PDF_NAME = process.env.FINAL_PDF_NAME ?? "prezime.pdf";
+const FINAL_COMPRESS = (process.env.FINAL_COMPRESS ?? "true") === "true";
+const GS_QUALITY = process.env.GS_QUALITY ?? "/ebook"; // /screen, /ebook, /printer, /prepress
 
-// Zadaci (može i preko env varijable PDF_TASKS_JSON = '[{"name":"matice.pdf","pages":["pages/ENTITET/matica*"]}]')
-const PDF_TASKS_xx = (() => {
+// Zadaci – po potrebi izmijeni ili postavi preko PDF_TASKS_JSON
+const PDF_TASKS = (() => {
   if (process.env.PDF_TASKS_JSON) {
     try {
       return JSON.parse(process.env.PDF_TASKS_JSON);
@@ -57,12 +58,13 @@ const PDF_TASKS_xx = (() => {
       console.warn("⚠ Nevažeći PDF_TASKS_JSON, koristim lokalnu konstantu. Greška:", e?.message || e);
     }
   }
-  // ➜ Primjeri (po potrebi mijenjaj):
   return [
-    // Sve stranice (kao fallback primjer)
-    { name: `${CURRENT_PROJECT}.pdf`, pages: ["pages/"] },
-    // Primjer filtriranog PDF-a
-    // { name: "matice.pdf", pages: ["pages/ENTITET/matica*"] },
+    { name: "koncept.pdf",  pages: ["pages/KONCEPT*"] },
+    { name: "rod.pdf",      pages: ["pages/ROD*"] },
+    { name: "matice.pdf",   pages: ["pages/ENTITET/matica*"] },
+    { name: "mjesto.pdf",   pages: ["pages/ENTITET/mjesto*"] },
+    { name: "obitelj.pdf",  pages: ["pages/ENTITET/obitelj*"] },
+    { name: "zupa.pdf",     pages: ["pages/ENTITET/zupa*"] },
   ];
 })();
 
@@ -194,9 +196,49 @@ async function renderHtmlToPdfBytes(page, urlPrimary, urlFallback) {
   return pdfBytes;
 }
 
+// Pokušaj kompresije GhostScriptom (ako postoji); inače samo kopira
+async function maybeCompressPdf(inputPath, outputPath, quality = "/ebook") {
+  if (!FINAL_COMPRESS) {
+    await fsp.copyFile(inputPath, outputPath);
+    return { method: "copy", ok: true };
+  }
+
+  try {
+    // je li gs dostupan?
+    await exec("command -v gs");
+  } catch {
+    console.warn("⚠ Ghostscript nije pronađen; preskačem kompresiju.");
+    await fsp.copyFile(inputPath, outputPath);
+    return { method: "copy-no-gs", ok: true };
+  }
+
+  const args = [
+    "-sDEVICE=pdfwrite",
+    "-dCompatibilityLevel=1.6",
+    `-dPDFSETTINGS=${quality}`, // /screen /ebook /printer /prepress
+    "-dDetectDuplicateImages=true",
+    "-dCompressFonts=true",
+    "-dSubsetFonts=true",
+    "-dNOPAUSE",
+    "-dQUIET",
+    "-dBATCH",
+    `-sOutputFile=${JSON.stringify(outputPath)}`,
+    JSON.stringify(inputPath),
+  ].join(" ");
+
+  try {
+    await exec(`gs ${args}`);
+    return { method: "ghostscript", ok: true };
+  } catch (e) {
+    console.warn("⚠ Ghostscript kompresija nije uspjela; vraćam nekopresirani PDF. Greška:", e?.message || e);
+    await fsp.copyFile(inputPath, outputPath);
+    return { method: "copy-fallback", ok: false };
+  }
+}
+
 // ---------- Main ----------
 (async () => {
-  console.log("=== generate-single-pdf.js (multi-output) ===");
+  console.log("=== generate-single-pdf.js (multi-output + final merge) ===");
   console.log("Project           :", CURRENT_PROJECT);
   console.log("PUBLIC_HOST       :", PUBLIC_HOST);
   console.log("GH_PAGES_DIR      :", path.resolve(absoluteGhPagesDir));
@@ -205,6 +247,9 @@ async function renderHtmlToPdfBytes(page, urlPrimary, urlFallback) {
   console.log("NAV_TIMEOUT_MS    :", NAV_TIMEOUT_MS);
   console.log("POST_GOTO_DELAY   :", POST_GOTO_DELAY_MS, "ms");
   console.log("TASKS             :", JSON.stringify(PDF_TASKS, null, 2));
+  console.log("FINAL_PDF_NAME    :", FINAL_PDF_NAME);
+  console.log("FINAL_COMPRESS    :", FINAL_COMPRESS);
+  console.log("GS_QUALITY        :", GS_QUALITY);
 
   if (!fs.existsSync(absoluteGhPagesDir)) {
     console.error(`Greška: GH_PAGES_DIR ne postoji: ${absoluteGhPagesDir}`);
@@ -234,8 +279,12 @@ async function renderHtmlToPdfBytes(page, urlPrimary, urlFallback) {
   let page = await browser.newPage();
   page.setDefaultNavigationTimeout(NAV_TIMEOUT_MS);
 
+  // Za finalni merge: tu ćemo skupljati sve stranice iz svih taskova,
+  // po redoslijedu definiranom u PDF_TASKS.
+  const finalMergedDoc = await PDFDocument.create();
+
   try {
-    // 3) Obradi svaki zadatak
+    // 3) Obradi svaki zadatak -> snimi posebni PDF + dodaj u finalMergedDoc
     for (const task of PDF_TASKS) {
       const outPdfPath = path.join(absoluteGhPagesDir, task.name);
       const patterns = Array.isArray(task.pages) ? task.pages.map(p => p.replace(/\\/g, "/")) : [];
@@ -256,7 +305,7 @@ async function renderHtmlToPdfBytes(page, urlPrimary, urlFallback) {
       console.log(`   • Patterni: ${JSON.stringify(patterns)}`);
       console.log(`   • Output: ${outPdfPath}`);
 
-      const finalDoc = await PDFDocument.create();
+      const taskDoc = await PDFDocument.create();
 
       for (let i = 0; i < taskFiles.length; i++) {
         if (i > 0 && i % PAGES_PER_TAB === 0) {
@@ -278,22 +327,44 @@ async function renderHtmlToPdfBytes(page, urlPrimary, urlFallback) {
             continue;
           }
           const srcDoc = await PDFDocument.load(pdfBytes);
-          const srcPages = await finalDoc.copyPages(srcDoc, srcDoc.getPageIndices());
-          srcPages.forEach(p => finalDoc.addPage(p));
+          const srcPages = await taskDoc.copyPages(srcDoc, srcDoc.getPageIndices());
+          srcPages.forEach(p => taskDoc.addPage(p));
         } catch (err) {
           console.error("      ✖ Greška tijekom render/merge:", err?.stack || err?.message || String(err));
         }
       }
 
-      const finalBytes = await finalDoc.save();
-      await fsp.writeFile(outPdfPath, finalBytes);
+      // Snimi task PDF
+      const taskBytes = await taskDoc.save({ useObjectStreams: true });
+      await fsp.writeFile(outPdfPath, taskBytes);
       console.log(`   ✔ Završeno: ${outPdfPath}`);
+
+      // Dodaj njegove stranice i u finalMergedDoc (zadržavamo redoslijed zadataka)
+      try {
+        const again = await PDFDocument.load(taskBytes);
+        const pages = await finalMergedDoc.copyPages(again, again.getPageIndices());
+        pages.forEach(p => finalMergedDoc.addPage(p));
+      } catch (e) {
+        console.warn(`   ⚠ Ne mogu dodati stranice iz ${task.name} u finalni PDF:`, e?.message || e);
+      }
     }
   } finally {
     try { await page.close(); } catch {}
     await browser.close().catch(() => {});
   }
 
+  // 4) Snimi finalni spojeni PDF, pa ga (ako je uključeno) komprimiraj
+  const finalTempPath = path.join(absoluteGhPagesDir, `__final_merged_tmp.pdf`);
+  const finalOutPath  = path.join(absoluteGhPagesDir, FINAL_PDF_NAME);
+
+  const finalBytes = await finalMergedDoc.save({ useObjectStreams: true });
+  await fsp.writeFile(finalTempPath, finalBytes);
+  console.log(`\n⏳ Spajanje gotovo, privremeni PDF: ${finalTempPath}`);
+
+  const { method } = await maybeCompressPdf(finalTempPath, finalOutPath, GS_QUALITY);
+  try { await fsp.unlink(finalTempPath); } catch {}
+
+  console.log(`✔ Finalni PDF (${method}): ${finalOutPath}`);
   console.log("✔ Svi zadaci obrađeni.");
 })().catch((e) => {
   console.error("Fatal error:", e?.stack || e?.message || String(e));
