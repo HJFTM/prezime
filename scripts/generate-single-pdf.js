@@ -115,39 +115,46 @@ function toHtmlPublicUrl(absoluteHtmlPath) {
   return encodeURI(url);
 }
 
-// Podrška za * (unutar segmenta) i ** (preko više segmenata).
-// Radi "prefix" usklađenje (ne zahtijeva da se uzorak podudara do kraja).
+// Podržava * (segment) i ** (preko više segmenata).
+// Radi "prefix" usklađenje: uzorak mora biti na početku putanje.
 function matchesAnyPattern(relPath, patterns = []) {
   if (!patterns?.length) return false;
 
-  const MATCH_CASE = (process.env.PDF_MATCH_CASE ?? "true") === "true";
+  const MATCH_CASE = (process.env.PDF_MATCH_CASE ?? "false") === "true";
   const norm = (s) => s.replace(/\\/g, "/");
-  const pathNorm = norm(relPath);
+  const pathNorm = MATCH_CASE ? norm(relPath) : norm(relPath).toLowerCase();
 
-  const escapeRe = (s) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+  // 1) Normaliziraj i (opcionalno) spusti u lower
+  const prep = (s) => {
+    const n = norm(String(s));
+    return MATCH_CASE ? n : n.toLowerCase();
+  };
 
-  const toPrefixRegex = (pat) => {
-    // normaliziraj, escapaj regex meta, pa zamijeni globove
-    const esc = escapeRe(norm(pat))
-      .replace(/\\\*\\\*/g, ".*")    // ** -> .*
-      .replace(/\\\*/g, "[^/]*");    // *  -> [^/]*
+  // 2) Pretvori glob u PREFIX-regex
+  const toPrefixRegex = (glob) => {
+    const DOUBLE = "__DS__";                      // placeholder za **
+    let g = prep(glob).replace(/\*\*/g, DOUBLE);  // prvo zaštiti **
 
-    // Prefix match: mora početi od početka, ali ne mora završiti
-    return new RegExp("^" + esc, MATCH_CASE ? "" : "i");
+    // Escapaj regex-metaznake (ne diramo slash i zvjezdicu jer su već obrađene)
+    g = g.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+
+    // Vrati ** i zamijeni * (segment)
+    g = g.replace(new RegExp(DOUBLE, "g"), ".*")  // ** → .*
+         .replace(/\*/g, "[^/]*");                // *  → [^/]*
+
+    // Prefix match (početak linije)
+    return new RegExp("^" + g, MATCH_CASE ? "" : "i");
   };
 
   for (const raw of patterns) {
     if (!raw) continue;
-    const pat = String(raw);
-
-    // Ako uzorak nema zvjezdice, zadrži staro ponašanje (prefiks)
-    if (!pat.includes("*")) {
-      if ((MATCH_CASE ? pathNorm : pathNorm.toLowerCase())
-            .startsWith(MATCH_CASE ? pat : pat.toLowerCase())) return true;
+    // Ako nema zvjezdica, zadrži staro ponašanje: običan prefiks
+    if (!String(raw).includes("*")) {
+      const pat = prep(raw);
+      if (pathNorm.startsWith(pat)) return true;
       continue;
     }
-
-    if (toPrefixRegex(pat).test(pathNorm)) return true;
+    if (toPrefixRegex(raw).test(pathNorm)) return true;
   }
   return false;
 }
