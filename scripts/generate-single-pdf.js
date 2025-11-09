@@ -115,22 +115,43 @@ function toHtmlPublicUrl(absoluteHtmlPath) {
   return encodeURI(url);
 }
 
-// Jednostavni "prefix" matcher: pattern s '*' znači "počinje s <prefix>"
+// Podrška za * (unutar segmenta) i ** (preko više segmenata).
+// Radi "prefix" usklađenje (ne zahtijeva da se uzorak podudara do kraja).
 function matchesAnyPattern(relPath, patterns = []) {
-  if (!patterns.length) return false;
+  if (!patterns?.length) return false;
+
+  const MATCH_CASE = (process.env.PDF_MATCH_CASE ?? "true") === "true";
+  const norm = (s) => s.replace(/\\/g, "/");
+  const pathNorm = norm(relPath);
+
+  const escapeRe = (s) => s.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
+
+  const toPrefixRegex = (pat) => {
+    // normaliziraj, escapaj regex meta, pa zamijeni globove
+    const esc = escapeRe(norm(pat))
+      .replace(/\\\*\\\*/g, ".*")    // ** -> .*
+      .replace(/\\\*/g, "[^/]*");    // *  -> [^/]*
+
+    // Prefix match: mora početi od početka, ali ne mora završiti
+    return new RegExp("^" + esc, MATCH_CASE ? "" : "i");
+  };
+
   for (const raw of patterns) {
     if (!raw) continue;
-    const pat = raw.replace(/\\/g, "/"); // normaliziraj
-    if (pat.endsWith("*")) {
-      const prefix = pat.slice(0, -1);
-      if (relPath.startsWith(prefix)) return true;
-    } else {
-      // točno ovaj prefix
-      if (relPath.startsWith(pat)) return true;
+    const pat = String(raw);
+
+    // Ako uzorak nema zvjezdice, zadrži staro ponašanje (prefiks)
+    if (!pat.includes("*")) {
+      if ((MATCH_CASE ? pathNorm : pathNorm.toLowerCase())
+            .startsWith(MATCH_CASE ? pat : pat.toLowerCase())) return true;
+      continue;
     }
+
+    if (toPrefixRegex(pat).test(pathNorm)) return true;
   }
   return false;
 }
+
 
 // Render jedne HTML stranice u PDF bytes (s headerom)
 async function renderHtmlToPdfBytes(page, urlPrimary, urlFallback) {
