@@ -15,10 +15,8 @@ import { PDFDocument } from "pdf-lib";
 import { exec as _exec } from "child_process";
 import { promisify } from "util";
 
-// 🔹 NOVO: koristimo tvoju helper funkciju iz zasebnog fajla
+// 👉 koristi tvoju helper funkciju
 import { extractPathsFromMenu } from "./menu_json.js";
-// 🔹 NOVO: za ekspandiranje globova nad *_menu.json datotekama
-import { globSync } from "glob";
 
 const exec = promisify(_exec);
 
@@ -54,7 +52,7 @@ const FINAL_PDF_NAME = process.env.FINAL_PDF_NAME ?? "prezime.pdf";
 const FINAL_COMPRESS = (process.env.FINAL_COMPRESS ?? "true") === "true";
 const GS_QUALITY = process.env.GS_QUALITY ?? "/ebook"; // /screen, /ebook, /printer, /prepress
 
-// 🔹 Zadaci – sada podržava i { menu: ["pages/Bosna_menu.json*"] } uz postojeći { pages: [...] }
+// Zadaci – sada podržava i { menu: ["pages/Bosna_menu.json*"] } uz postojeći { pages: [...] }
 const PDF_TASKS = (() => {
   if (process.env.PDF_TASKS_JSON) {
     try {
@@ -65,12 +63,8 @@ const PDF_TASKS = (() => {
   }
   return [
     // { name: "koncept.pdf",  pages: ["pages/KONCEPT*"] },
-    // 🔻 umjesto globova nad HTML-om, sada čitamo menu JSON i od tamo dobijemo rute
     { name: "rod.pdf", menu: ["pages/Bosna_menu.json*"] },
     // { name: "matice.pdf",   menu: ["pages/Matice_menu.json*"] },
-    // { name: "mjesto.pdf",   menu: ["pages/Mjesta_menu.json*"] },
-    // { name: "obitelj.pdf",  menu: ["pages/Obitelji_menu.json*"] },
-    // { name: "zupa.pdf",     menu: ["pages/Zupe_menu.json*"] },
   ];
 })();
 
@@ -130,31 +124,21 @@ function matchesAnyPattern(relPath, patterns = []) {
   const norm = (s) => s.replace(/\\/g, "/");
   const pathNorm = MATCH_CASE ? norm(relPath) : norm(relPath).toLowerCase();
 
-  // 1) Normaliziraj i (opcionalno) spusti u lower
   const prep = (s) => {
     const n = norm(String(s));
     return MATCH_CASE ? n : n.toLowerCase();
   };
 
-  // 2) Pretvori glob u PREFIX-regex
   const toPrefixRegex = (glob) => {
-    const DOUBLE = "__DS__";                      // placeholder za **
-    let g = prep(glob).replace(/\*\*/g, DOUBLE);  // prvo zaštiti **
-
-    // Escapaj regex-metaznake (ne diramo slash i zvjezdicu jer su već obrađene)
+    const DOUBLE = "__DS__";
+    let g = prep(glob).replace(/\*\*/g, DOUBLE);
     g = g.replace(/[.+?^${}()|[\]\\]/g, "\\$&");
-
-    // Vrati ** i zamijeni * (segment)
-    g = g.replace(new RegExp(DOUBLE, "g"), ".*")  // ** → .*
-         .replace(/\*/g, "[^/]*");                // *  → [^/]*
-
-    // Prefix match (početak linije)
+    g = g.replace(new RegExp(DOUBLE, "g"), ".*").replace(/\*/g, "[^/]*");
     return new RegExp("^" + g, MATCH_CASE ? "" : "i");
   };
 
   for (const raw of patterns) {
     if (!raw) continue;
-    // Ako nema zvjezdica, zadrži staro ponašanje: običan prefiks
     if (!String(raw).includes("*")) {
       const pat = prep(raw);
       if (pathNorm.startsWith(pat)) return true;
@@ -165,30 +149,55 @@ function matchesAnyPattern(relPath, patterns = []) {
   return false;
 }
 
-// 🔹 NOVO: mapiranje URL rute (npr. "/pages/ROD/prezime/Bosna") na lokalni HTML file
+// 🔸 rekurzivno izlistaj sve fajlove unutar gh-pages (sync, minimalna ovisnost)
+function listAllFilesSync(dir) {
+  const out = [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const e of entries) {
+    const full = path.join(dir, e.name);
+    if (e.isDirectory()) out.push(...listAllFilesSync(full));
+    else out.push(full);
+  }
+  return out;
+}
+
+// 🔹 EXPANDER ZA MENU GLOBS (bez 'glob' paketa):
+//   - uzorke (npr. "pages/Bosna_menu.json*") uspoređujemo s REL putanjama prema GH_PAGES_DIR
+//   - zatim vraćamo apsolutne putanje JSON datoteka koje matchaju
+function expandMenuFiles(patterns) {
+  const files = listAllFilesSync(absoluteGhPagesDir)
+    .filter((f) => f.toLowerCase().endsWith(".json")); // samo JSON
+
+  const relFiles = files.map((abs) =>
+    path.relative(absoluteGhPagesDir, abs).split(path.sep).join("/")
+  );
+
+  const matches = relFiles
+    .filter((rel) => matchesAnyPattern(rel, patterns))
+    .map((rel) => path.resolve(absoluteGhPagesDir, rel));
+
+  return matches;
+}
+
+// 🔹 mapiranje URL rute (npr. "/pages/ROD/prezime/Bosna") na lokalni HTML file
 function urlPathToHtmlAbs(urlPath) {
   if (!urlPath) return null;
   let rel = String(urlPath).replace(/^\/+/, ""); // skini vodeće '/'
 
-  // Probaj "…/index.html" pa "….html"
   const asIndex = path.join(absoluteGhPagesDir, rel, "index.html");
   if (fs.existsSync(asIndex)) return path.resolve(asIndex);
 
   const asHtml = path.join(absoluteGhPagesDir, rel + ".html");
   if (fs.existsSync(asHtml)) return path.resolve(asHtml);
 
-  // Ako ništa – vrati null (pozivatelj odlučuje preskočiti)
   return null;
 }
 
-// 🔹 NOVO: iz taska dobavi listu apsolutnih HTML datoteka koje treba renderirati
+// 🔹 iz taska dobavi listu apsolutnih HTML datoteka koje treba renderirati
 function getTaskFilesFromTask(task, allHtmlAbs) {
-  // A) Back-compat: task.pages kao PATTERNI nad datotečnim stablom
+  // A) Back-compat: task.pages kao PATTERNI nad datotečnim stablom ili kao rute
   if (Array.isArray(task.pages) && task.pages.length > 0) {
     const patterns = task.pages.map((p) => String(p).replace(/\\/g, "/"));
-
-    // Ako barem jedan element izgleda kao URL ruta (počinje sa "/pages/"),
-    // tretiramo cijeli niz kao rute — mapiramo svaku na HTML file.
     const looksLikeRoutes = patterns.some((p) => p.startsWith("/"));
     if (looksLikeRoutes) {
       const files = [];
@@ -199,8 +208,6 @@ function getTaskFilesFromTask(task, allHtmlAbs) {
       }
       return files;
     }
-
-    // Inače – zadrži stari mehanizam (filter preko glob prefixa nad relativnim putanjama)
     return allHtmlAbs.filter((abs) => {
       const rel = path.relative(absoluteGhPagesDir, abs).split(path.sep).join("/");
       return matchesAnyPattern(rel, patterns);
@@ -209,16 +216,13 @@ function getTaskFilesFromTask(task, allHtmlAbs) {
 
   // B) NOVO: task.menu → globs do *_menu.json → izvuci rute → mapiraj u HTML datoteke
   if (Array.isArray(task.menu) && task.menu.length > 0) {
-    const menuFiles = task.menu
-      .flatMap((pattern) => globSync(pattern, { nodir: true }))
-      .map((p) => path.resolve(p));
+    const menuFiles = expandMenuFiles(task.menu);
 
     if (!menuFiles.length) {
       console.warn(`   ⚠ Nema pogodaka za menu globs: ${JSON.stringify(task.menu)}`);
       return [];
     }
 
-    // Izvuci rute iz svakog menu json-a
     const urlRoutes = [];
     for (const mf of menuFiles) {
       try {
@@ -230,9 +234,7 @@ function getTaskFilesFromTask(task, allHtmlAbs) {
       }
     }
 
-    // Dedup rute po redoslijedu (Set)
     const dedupRoutes = Array.from(new Set(urlRoutes));
-    // Mapiranje svake rute u postojeći HTML
     const files = [];
     for (const route of dedupRoutes) {
       const abs = urlPathToHtmlAbs(route);
@@ -318,7 +320,6 @@ async function maybeCompressPdf(inputPath, outputPath, quality = "/ebook") {
   }
 
   try {
-    // je li gs dostupan?
     await exec("command -v gs");
   } catch {
     console.warn("⚠ Ghostscript nije pronađen; preskačem kompresiju.");
@@ -329,7 +330,7 @@ async function maybeCompressPdf(inputPath, outputPath, quality = "/ebook") {
   const args = [
     "-sDEVICE=pdfwrite",
     "-dCompatibilityLevel=1.6",
-    `-dPDFSETTINGS=${quality}`, // /screen /ebook /printer /prepress
+    `-dPDFSETTINGS=${quality}`,
     "-dDetectDuplicateImages=true",
     "-dCompressFonts=true",
     "-dSubsetFonts=true",
@@ -374,7 +375,7 @@ async function maybeCompressPdf(inputPath, outputPath, quality = "/ebook") {
     process.exit(2);
   }
 
-  // 1) Skupi sve .html (apsolutne putanje) – koristimo za legacy 'pages' pattern matching
+  // 1) Skupi sve .html (apsolutne putanje) – legacy 'pages' match
   const allHtmlAbs = [];
   for await (const fp of walk(localPagesRoot)) {
     if (isHtmlFile(fp)) allHtmlAbs.push(fp);
@@ -385,7 +386,7 @@ async function maybeCompressPdf(inputPath, outputPath, quality = "/ebook") {
   }
   if (SORT_INPUT) allHtmlAbs.sort((a, b) => a.localeCompare(b));
 
-  // 2) Pupeteer browser
+  // 2) Puppeteer browser
   const browser = await puppeteer.launch({
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
@@ -393,16 +394,11 @@ async function maybeCompressPdf(inputPath, outputPath, quality = "/ebook") {
   let page = await browser.newPage();
   page.setDefaultNavigationTimeout(NAV_TIMEOUT_MS);
 
-  // Za finalni merge: tu ćemo skupljati sve stranice iz svih taskova,
-  // po redoslijedu definiranom u PDF_TASKS.
   const finalMergedDoc = await PDFDocument.create();
 
   try {
-    // 3) Obradi svaki zadatak -> snimi posebni PDF + dodaj u finalMergedDoc
     for (const task of PDF_TASKS) {
-      // 🔹 NOVO: dobavi listu HTML-ova za ovaj task (iz menu.json ili legacy patterns)
       const taskFiles = getTaskFilesFromTask(task, allHtmlAbs);
-
       const outPdfPath = path.join(absoluteGhPagesDir, task.name);
 
       if (!taskFiles.length) {
@@ -448,12 +444,10 @@ async function maybeCompressPdf(inputPath, outputPath, quality = "/ebook") {
         }
       }
 
-      // Snimi task PDF
       const taskBytes = await taskDoc.save({ useObjectStreams: true });
       await fsp.writeFile(outPdfPath, taskBytes);
       console.log(`   ✔ Završeno: ${outPdfPath}`);
 
-      // Dodaj njegove stranice i u finalMergedDoc (zadržavamo redoslijed zadataka)
       try {
         const again = await PDFDocument.load(taskBytes);
         const pages = await finalMergedDoc.copyPages(again, again.getPageIndices());
@@ -467,7 +461,6 @@ async function maybeCompressPdf(inputPath, outputPath, quality = "/ebook") {
     await browser.close().catch(() => {});
   }
 
-  // 4) Snimi finalni spojeni PDF, pa ga (ako je uključeno) komprimiraj
   const finalTempPath = path.join(absoluteGhPagesDir, `__final_merged_tmp.pdf`);
   const finalOutPath  = path.join(absoluteGhPagesDir, FINAL_PDF_NAME);
 
