@@ -9,8 +9,8 @@ jobs:
     permissions:
       contents: write
     env:
-      PROJECTS: "uvod bosna stupnik dubrovnik"
-
+      PROJECTS: "bosna"
+      PROJECTS_x: "uvod bosna stupnik dubrovnik"
     steps:
       - name: Ensure gh-pages exists
         uses: actions/checkout@v4
