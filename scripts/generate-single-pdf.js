@@ -60,7 +60,7 @@ const PDF_TASKS = (() => {
   }
   return [
     // { name: "koncept.pdf",  pages: ["pages/KONCEPT*"] },
-    { name: "rod.pdf",      pages: ["pages/ROD*"] },
+    { name: "rod.pdf",      pages: ["pages/ROD/**/Bosna*"] },
     //{ name: "matice.pdf",   pages: ["pages/ENTITET/matica*"] },
     //{ name: "mjesto.pdf",   pages: ["pages/ENTITET/mjesto*"] },
     //{ name: "obitelj.pdf",  pages: ["pages/ENTITET/obitelj*"] },
