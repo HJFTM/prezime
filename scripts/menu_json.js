@@ -3,7 +3,7 @@
  * @param {Object} menuJson - objekt iz menu.json (već parsiran iz datoteke)
  * @returns {string[]} lista pathova (npr. ["/pages/ROD/prezime/Bosna", "/pages/ROD/generacije/Bosna", ...])
  */
-function extractPathsFromMenu(menuJson) {
+export function extractPathsFromMenu(menuJson) {
   const paths = [];
 
   function traverse(pages) {
