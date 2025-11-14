@@ -6,27 +6,307 @@
       "pages": [
         {
           "name": "1700. Popovići",
-          "path": "/pages/ENTITET/mjesto/Popovi%C4%87i"
+          "path": "/pages/ENTITET/mjesto/Popovi%C4%87i",
+          "pages": [
+            {
+              "name": "Mjesto",
+              "path": "/pages/ENTITET/mjesto/Popovi%C4%87i"
+            },
+            {
+              "name": "Migracije",
+              "path": "/pages/ENTITET/mjesto_migracije/Popovi%C4%87i"
+            },
+            {
+              "name": "Stablo",
+              "path": "/pages/ENTITET/mjesto_stablo/Popovi%C4%87i"
+            },
+            {
+              "name": "Zapisi",
+              "path": "/pages/ENTITET/mjesto_zapisi/Popovi%C4%87i"
+            },
+            {
+              "name": "Obitelji",
+              "path": "/pages/ENTITET/mjesto_obitelji/Popovi%C4%87i"
+            },
+            {
+              "name": "Župe",
+              "path": "/pages/ENTITET/mjesto_zupe/Popovi%C4%87i"
+            },
+            {
+              "name": "Događaji",
+              "path": "/pages/ENTITET/mjesto_dogadjaji/Popovi%C4%87i"
+            },
+            {
+              "name": "Groblje",
+              "path": "/pages/ENTITET/mjesto_groblje/Popovi%C4%87i"
+            }
+          ]
         },
         {
           "name": "1748. Dragalovci",
-          "path": "/pages/ENTITET/mjesto/Dragalovci"
+          "path": "/pages/ENTITET/mjesto/Dragalovci",
+          "pages": [
+            {
+              "name": "Mjesto",
+              "path": "/pages/ENTITET/mjesto/Dragalovci"
+            },
+            {
+              "name": "Migracije",
+              "path": "/pages/ENTITET/mjesto_migracije/Dragalovci"
+            },
+            {
+              "name": "Stablo",
+              "path": "/pages/ENTITET/mjesto_stablo/Dragalovci"
+            },
+            {
+              "name": "Zapisi",
+              "path": "/pages/ENTITET/mjesto_zapisi/Dragalovci"
+            },
+            {
+              "name": "Obitelji",
+              "path": "/pages/ENTITET/mjesto_obitelji/Dragalovci"
+            },
+            {
+              "name": "Župe",
+              "path": "/pages/ENTITET/mjesto_zupe/Dragalovci"
+            },
+            {
+              "name": "Događaji",
+              "path": "/pages/ENTITET/mjesto_dogadjaji/Dragalovci"
+            },
+            {
+              "name": "Groblje",
+              "path": "/pages/ENTITET/mjesto_groblje/Dragalovci"
+            }
+          ]
         },
         {
           "name": "1758. Sivša",
-          "path": "/pages/ENTITET/mjesto/Siv%C5%A1a"
+          "path": "/pages/ENTITET/mjesto/Siv%C5%A1a",
+          "pages": [
+            {
+              "name": "Mjesto",
+              "path": "/pages/ENTITET/mjesto/Siv%C5%A1a"
+            },
+            {
+              "name": "Migracije",
+              "path": "/pages/ENTITET/mjesto_migracije/Siv%C5%A1a"
+            },
+            {
+              "name": "Stablo",
+              "path": "/pages/ENTITET/mjesto_stablo/Siv%C5%A1a"
+            },
+            {
+              "name": "Zapisi",
+              "path": "/pages/ENTITET/mjesto_zapisi/Siv%C5%A1a"
+            },
+            {
+              "name": "Obitelji",
+              "path": "/pages/ENTITET/mjesto_obitelji/Siv%C5%A1a"
+            },
+            {
+              "name": "Župe",
+              "path": "/pages/ENTITET/mjesto_zupe/Siv%C5%A1a"
+            },
+            {
+              "name": "Događaji",
+              "path": "/pages/ENTITET/mjesto_dogadjaji/Siv%C5%A1a"
+            },
+            {
+              "name": "Groblje",
+              "path": "/pages/ENTITET/mjesto_groblje/Siv%C5%A1a"
+            }
+          ]
         },
         {
           "name": "1765. Dubočac",
-          "path": "/pages/ENTITET/mjesto/Dubo%C4%8Dac"
+          "path": "/pages/ENTITET/mjesto/Dubo%C4%8Dac",
+          "pages": [
+            {
+              "name": "Mjesto",
+              "path": "/pages/ENTITET/mjesto/Dubo%C4%8Dac"
+            },
+            {
+              "name": "Migracije",
+              "path": "/pages/ENTITET/mjesto_migracije/Dubo%C4%8Dac"
+            },
+            {
+              "name": "Stablo",
+              "path": "/pages/ENTITET/mjesto_stablo/Dubo%C4%8Dac"
+            },
+            {
+              "name": "Zapisi",
+              "path": "/pages/ENTITET/mjesto_zapisi/Dubo%C4%8Dac"
+            },
+            {
+              "name": "Obitelji",
+              "path": "/pages/ENTITET/mjesto_obitelji/Dubo%C4%8Dac"
+            },
+            {
+              "name": "Župe",
+              "path": "/pages/ENTITET/mjesto_zupe/Dubo%C4%8Dac"
+            },
+            {
+              "name": "Događaji",
+              "path": "/pages/ENTITET/mjesto_dogadjaji/Dubo%C4%8Dac"
+            },
+            {
+              "name": "Groblje",
+              "path": "/pages/ENTITET/mjesto_groblje/Dubo%C4%8Dac"
+            }
+          ]
         },
         {
           "name": "1775. Miljanovci",
-          "path": "/pages/ENTITET/mjesto/Miljanovci"
+          "path": "/pages/ENTITET/mjesto/Miljanovci",
+          "pages": [
+            {
+              "name": "Mjesto",
+              "path": "/pages/ENTITET/mjesto/Miljanovci"
+            },
+            {
+              "name": "Migracije",
+              "path": "/pages/ENTITET/mjesto_migracije/Miljanovci"
+            },
+            {
+              "name": "Stablo",
+              "path": "/pages/ENTITET/mjesto_stablo/Miljanovci"
+            },
+            {
+              "name": "Zapisi",
+              "path": "/pages/ENTITET/mjesto_zapisi/Miljanovci"
+            },
+            {
+              "name": "Obitelji",
+              "path": "/pages/ENTITET/mjesto_obitelji/Miljanovci"
+            },
+            {
+              "name": "Župe",
+              "path": "/pages/ENTITET/mjesto_zupe/Miljanovci"
+            },
+            {
+              "name": "Događaji",
+              "path": "/pages/ENTITET/mjesto_dogadjaji/Miljanovci"
+            },
+            {
+              "name": "Groblje",
+              "path": "/pages/ENTITET/mjesto_groblje/Miljanovci"
+            }
+          ]
+        },
+        {
+          "name": "1791. Kobaš",
+          "path": "/pages/ENTITET/mjesto/Koba%C5%A1",
+          "pages": [
+            {
+              "name": "Mjesto",
+              "path": "/pages/ENTITET/mjesto/Koba%C5%A1"
+            },
+            {
+              "name": "Migracije",
+              "path": "/pages/ENTITET/mjesto_migracije/Koba%C5%A1"
+            },
+            {
+              "name": "Stablo",
+              "path": "/pages/ENTITET/mjesto_stablo/Koba%C5%A1"
+            },
+            {
+              "name": "Zapisi",
+              "path": "/pages/ENTITET/mjesto_zapisi/Koba%C5%A1"
+            },
+            {
+              "name": "Obitelji",
+              "path": "/pages/ENTITET/mjesto_obitelji/Koba%C5%A1"
+            },
+            {
+              "name": "Župe",
+              "path": "/pages/ENTITET/mjesto_zupe/Koba%C5%A1"
+            },
+            {
+              "name": "Događaji",
+              "path": "/pages/ENTITET/mjesto_dogadjaji/Koba%C5%A1"
+            },
+            {
+              "name": "Groblje",
+              "path": "/pages/ENTITET/mjesto_groblje/Koba%C5%A1"
+            }
+          ]
         },
         {
           "name": "1810. Pećnik",
-          "path": "/pages/ENTITET/mjesto/Pe%C4%87nik"
+          "path": "/pages/ENTITET/mjesto/Pe%C4%87nik",
+          "pages": [
+            {
+              "name": "Mjesto",
+              "path": "/pages/ENTITET/mjesto/Pe%C4%87nik"
+            },
+            {
+              "name": "Migracije",
+              "path": "/pages/ENTITET/mjesto_migracije/Pe%C4%87nik"
+            },
+            {
+              "name": "Stablo",
+              "path": "/pages/ENTITET/mjesto_stablo/Pe%C4%87nik"
+            },
+            {
+              "name": "Zapisi",
+              "path": "/pages/ENTITET/mjesto_zapisi/Pe%C4%87nik"
+            },
+            {
+              "name": "Obitelji",
+              "path": "/pages/ENTITET/mjesto_obitelji/Pe%C4%87nik"
+            },
+            {
+              "name": "Župe",
+              "path": "/pages/ENTITET/mjesto_zupe/Pe%C4%87nik"
+            },
+            {
+              "name": "Događaji",
+              "path": "/pages/ENTITET/mjesto_dogadjaji/Pe%C4%87nik"
+            },
+            {
+              "name": "Groblje",
+              "path": "/pages/ENTITET/mjesto_groblje/Pe%C4%87nik"
+            }
+          ]
+        },
+        {
+          "name": "1832. Gornja Dubica",
+          "path": "/pages/ENTITET/mjesto/Gornja%20Dubica",
+          "pages": [
+            {
+              "name": "Mjesto",
+              "path": "/pages/ENTITET/mjesto/Gornja%20Dubica"
+            },
+            {
+              "name": "Migracije",
+              "path": "/pages/ENTITET/mjesto_migracije/Gornja%20Dubica"
+            },
+            {
+              "name": "Stablo",
+              "path": "/pages/ENTITET/mjesto_stablo/Gornja%20Dubica"
+            },
+            {
+              "name": "Zapisi",
+              "path": "/pages/ENTITET/mjesto_zapisi/Gornja%20Dubica"
+            },
+            {
+              "name": "Obitelji",
+              "path": "/pages/ENTITET/mjesto_obitelji/Gornja%20Dubica"
+            },
+            {
+              "name": "Župe",
+              "path": "/pages/ENTITET/mjesto_zupe/Gornja%20Dubica"
+            },
+            {
+              "name": "Događaji",
+              "path": "/pages/ENTITET/mjesto_dogadjaji/Gornja%20Dubica"
+            },
+            {
+              "name": "Groblje",
+              "path": "/pages/ENTITET/mjesto_groblje/Gornja%20Dubica"
+            }
+          ]
         }
       ]
     }
@@ -37,50 +317,68 @@
     "/pages/ENTITET/mjesto/Siv%C5%A1a",
     "/pages/ENTITET/mjesto/Dubo%C4%8Dac",
     "/pages/ENTITET/mjesto/Miljanovci",
+    "/pages/ENTITET/mjesto/Koba%C5%A1",
     "/pages/ENTITET/mjesto/Pe%C4%87nik",
+    "/pages/ENTITET/mjesto/Gornja%20Dubica",
+    "/pages/ENTITET/mjesto/Popovi%C4%87i",
     "/pages/ENTITET/mjesto_migracije/Popovi%C4%87i",
+    "/pages/ENTITET/mjesto_stablo/Popovi%C4%87i",
     "/pages/ENTITET/mjesto_zapisi/Popovi%C4%87i",
     "/pages/ENTITET/mjesto_obitelji/Popovi%C4%87i",
     "/pages/ENTITET/mjesto_zupe/Popovi%C4%87i",
     "/pages/ENTITET/mjesto_dogadjaji/Popovi%C4%87i",
     "/pages/ENTITET/mjesto_groblje/Popovi%C4%87i",
+    "/pages/ENTITET/mjesto/Dragalovci",
     "/pages/ENTITET/mjesto_migracije/Dragalovci",
+    "/pages/ENTITET/mjesto_stablo/Dragalovci",
     "/pages/ENTITET/mjesto_zapisi/Dragalovci",
     "/pages/ENTITET/mjesto_obitelji/Dragalovci",
     "/pages/ENTITET/mjesto_zupe/Dragalovci",
     "/pages/ENTITET/mjesto_dogadjaji/Dragalovci",
     "/pages/ENTITET/mjesto_groblje/Dragalovci",
+    "/pages/ENTITET/mjesto/Siv%C5%A1a",
     "/pages/ENTITET/mjesto_migracije/Siv%C5%A1a",
+    "/pages/ENTITET/mjesto_stablo/Siv%C5%A1a",
     "/pages/ENTITET/mjesto_zapisi/Siv%C5%A1a",
     "/pages/ENTITET/mjesto_obitelji/Siv%C5%A1a",
     "/pages/ENTITET/mjesto_zupe/Siv%C5%A1a",
     "/pages/ENTITET/mjesto_dogadjaji/Siv%C5%A1a",
     "/pages/ENTITET/mjesto_groblje/Siv%C5%A1a",
+    "/pages/ENTITET/mjesto/Dubo%C4%8Dac",
     "/pages/ENTITET/mjesto_migracije/Dubo%C4%8Dac",
+    "/pages/ENTITET/mjesto_stablo/Dubo%C4%8Dac",
     "/pages/ENTITET/mjesto_zapisi/Dubo%C4%8Dac",
     "/pages/ENTITET/mjesto_obitelji/Dubo%C4%8Dac",
     "/pages/ENTITET/mjesto_zupe/Dubo%C4%8Dac",
     "/pages/ENTITET/mjesto_dogadjaji/Dubo%C4%8Dac",
     "/pages/ENTITET/mjesto_groblje/Dubo%C4%8Dac",
+    "/pages/ENTITET/mjesto/Miljanovci",
     "/pages/ENTITET/mjesto_migracije/Miljanovci",
+    "/pages/ENTITET/mjesto_stablo/Miljanovci",
     "/pages/ENTITET/mjesto_zapisi/Miljanovci",
     "/pages/ENTITET/mjesto_obitelji/Miljanovci",
     "/pages/ENTITET/mjesto_zupe/Miljanovci",
     "/pages/ENTITET/mjesto_dogadjaji/Miljanovci",
     "/pages/ENTITET/mjesto_groblje/Miljanovci",
+    "/pages/ENTITET/mjesto/Koba%C5%A1",
     "/pages/ENTITET/mjesto_migracije/Koba%C5%A1",
+    "/pages/ENTITET/mjesto_stablo/Koba%C5%A1",
     "/pages/ENTITET/mjesto_zapisi/Koba%C5%A1",
     "/pages/ENTITET/mjesto_obitelji/Koba%C5%A1",
     "/pages/ENTITET/mjesto_zupe/Koba%C5%A1",
     "/pages/ENTITET/mjesto_dogadjaji/Koba%C5%A1",
     "/pages/ENTITET/mjesto_groblje/Koba%C5%A1",
+    "/pages/ENTITET/mjesto/Pe%C4%87nik",
     "/pages/ENTITET/mjesto_migracije/Pe%C4%87nik",
+    "/pages/ENTITET/mjesto_stablo/Pe%C4%87nik",
     "/pages/ENTITET/mjesto_zapisi/Pe%C4%87nik",
     "/pages/ENTITET/mjesto_obitelji/Pe%C4%87nik",
     "/pages/ENTITET/mjesto_zupe/Pe%C4%87nik",
     "/pages/ENTITET/mjesto_dogadjaji/Pe%C4%87nik",
     "/pages/ENTITET/mjesto_groblje/Pe%C4%87nik",
+    "/pages/ENTITET/mjesto/Gornja%20Dubica",
     "/pages/ENTITET/mjesto_migracije/Gornja%20Dubica",
+    "/pages/ENTITET/mjesto_stablo/Gornja%20Dubica",
     "/pages/ENTITET/mjesto_zapisi/Gornja%20Dubica",
     "/pages/ENTITET/mjesto_obitelji/Gornja%20Dubica",
     "/pages/ENTITET/mjesto_zupe/Gornja%20Dubica",
