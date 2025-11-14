@@ -293,19 +293,10 @@ async function renderHtmlToPdfBytes(page, urlPrimary, urlFallback) {
       })
   );
 
-  // 🔹 NOVO: čekaj da se sve slike učitaju
-  try {
-    await page.waitForFunction(
-      () =>
-        Array.from(document.images || []).every(
-          (img) => img.complete && img.naturalWidth > 0
-        ),
-      { timeout: NAV_TIMEOUT_MS }
-    );
-  } catch (e) {
-    console.warn("   ⚠ Nisu se sve slike stigle učitati prije timeouta.");
-    // možeš ignorirati grešku i svejedno generirati PDF
-  }
+  // 🔸 dodatno čekaj da Observable završi (brutalni pristup)
+  const OBS_EXTRA_WAIT_MS = Number(process.env.OBS_EXTRA_WAIT_MS ?? 5000);
+  await delay(OBS_EXTRA_WAIT_MS);
+  
 
   const headerHtml = `
     <div style="font-size:8px;
