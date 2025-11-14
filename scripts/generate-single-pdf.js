@@ -281,7 +281,10 @@ async function renderHtmlToPdfBytes(page, urlPrimary, urlFallback) {
 
   if (!loaded) return null;
 
+  // 🔹 kratki delay nakon goto (ostavi kako je)
   await delay(POST_GOTO_DELAY_MS);
+
+  // 🔹 čekaj da se stranica "dofinizira" (load event)
   await page.evaluate(
     () =>
       new Promise((resolve) => {
@@ -289,6 +292,20 @@ async function renderHtmlToPdfBytes(page, urlPrimary, urlFallback) {
         window.addEventListener("load", () => resolve(), { once: true });
       })
   );
+
+  // 🔹 NOVO: čekaj da se sve slike učitaju
+  try {
+    await page.waitForFunction(
+      () =>
+        Array.from(document.images || []).every(
+          (img) => img.complete && img.naturalWidth > 0
+        ),
+      { timeout: NAV_TIMEOUT_MS }
+    );
+  } catch (e) {
+    console.warn("   ⚠ Nisu se sve slike stigle učitati prije timeouta.");
+    // možeš ignorirati grešku i svejedno generirati PDF
+  }
 
   const headerHtml = `
     <div style="font-size:8px;
@@ -314,6 +331,7 @@ async function renderHtmlToPdfBytes(page, urlPrimary, urlFallback) {
 
   return pdfBytes;
 }
+
 
 // Pokušaj kompresije GhostScriptom (ako postoji); inače samo kopira
 async function maybeCompressPdf(inputPath, outputPath, quality = "/ebook") {
