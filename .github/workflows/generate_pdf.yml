@@ -1,4 +1,4 @@
-name: Generate & Publish PDFs (tasks + final)
+name: PDF - Generate & Publish (tasks + final)
 
 on:
   workflow_dispatch:
