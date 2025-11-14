@@ -19,20 +19,9 @@ jobs:
       PUBLIC_HOST: https://hjftm.github.io
 
       # ▶︎ Nova okolina za skriptu:
-      FINAL_PDF_NAME: prezime.pdf        # kako želiš da se zove finalni PDF
-      FINAL_COMPRESS: "true"             # skripta koristi Ghostscript ako postoji
-      GS_QUALITY: "/ebook"               # /screen /ebook /printer /prepress
-
-      # (po želji predefiniraj zadatke preko JSON-a)
-      # PDF_TASKS_JSON: >-
-      #   [
-      #     {"name":"koncept.pdf","pages":["pages/KONCEPT*"]},
-      #     {"name":"rod.pdf","pages":["pages/ROD*"]},
-      #     {"name":"matice.pdf","pages":["pages/ENTITET/matica*"]},
-      #     {"name":"mjesto.pdf","pages":["pages/ENTITET/mjesto*"]},
-      #     {"name":"obitelj.pdf","pages":["pages/ENTITET/obitelj*"]},
-      #     {"name":"zupa.pdf","pages":["pages/ENTITET/zupa*"]}
-      #   ]
+      # FINAL_PDF_NAME: prezime.pdf        # kako želiš da se zove finalni PDF
+      # FINAL_COMPRESS: "true"             # skripta koristi Ghostscript ako postoji
+      # GS_QUALITY: "/ebook"               # /screen /ebook /printer /prepress
 
     steps:
       - name: Checkout main
@@ -70,29 +59,6 @@ jobs:
           echo "PDFs in gh-pages:"
           ls -lh gh-pages/*.pdf || true
 
-      # ── VARIJANTA B (opcionalno): dodatna kompresija samo finala nakon skripte ──
-      # - name: Extra compress final to <100 MB (optional)
-      #   run: |
-      #     cd gh-pages
-      #     IN="${{ env.FINAL_PDF_NAME }}"
-      #     if [ ! -f "$IN" ]; then
-      #       echo "ERROR: $IN not found in gh-pages"; ls -la; exit 1
-      #     fi
-      #     TARGET=100000000
-      #     OUT="${IN%.pdf}.min.pdf"
-      #     echo "Initial size:"; ls -lh "$IN"
-      #     gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/ebook \
-      #        -dNOPAUSE -dBATCH -dQUIET \
-      #        -sOutputFile="$OUT" "$IN"
-      #     size=$(stat -c%s "$OUT")
-      #     echo "After /ebook: $((size/1024/1024)) MB"
-      #     if [ "$size" -ge "$TARGET" ]; then
-      #       gs -sDEVICE=pdfwrite -dCompatibilityLevel=1.4 -dPDFSETTINGS=/screen \
-      #          -dNOPAUSE -dBATCH -dQUIET \
-      #          -sOutputFile="$OUT" "$IN"
-      #     fi
-      #     mv -f "$OUT" "$IN"
-      #     echo "Final size:"; ls -lh "$IN"
 
       - name: Commit & push ALL PDFs
         working-directory: gh-pages
