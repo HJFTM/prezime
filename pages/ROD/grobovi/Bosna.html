@@ -36,9 +36,9 @@ import "../../../_observablehq/client.e9d881c7.js";
     <li class="observablehq-link"><a href="../obitelji/Bosna">  Obitelji</a></li>
     <li class="observablehq-link"><a href="../dogadjaji/Bosna">  Događaji</a></li>
     <li class="observablehq-link"><a href="../stablo/Bosna">  Stablo</a></li>
-    <li class="observablehq-link"><a href="../bolesti/Bosna">  Bolesti</a></li>
     <li class="observablehq-link"><a href="../mjesta/Bosna">  Mjesta</a></li>
     <li class="observablehq-link"><a href="../migracije/Bosna">  Migracije</a></li>
+    <li class="observablehq-link"><a href="../bolesti/Bosna">  Bolesti</a></li>
     <li class="observablehq-link"><a href="../izvori/Bosna">  Izvori*</a></li>
     <li class="observablehq-link"><a href="../zupe/Bosna">  Župe</a></li>
     </ol>
@@ -65,12 +65,6 @@ import "../../../_observablehq/client.e9d881c7.js";
     <li class="observablehq-link"><a href="../pismo/Bosna">  Pismo / Jezik</a></li>
     </ol>
   </section>
-  <section>
-    <summary>----------</summary>
-    <ol>
-    <li class="observablehq-link"><a href="../../KONCEPT/Navigacija">Sadržaj</a></li>
-    </ol>
-  </section>
 </nav>
 <script>{const e=document.querySelector("#observablehq-sidebar"),o=document.querySelector("#observablehq-sidebar-toggle"),r=sessionStorage.getItem("observablehq-sidebar");r?o.checked=r==="true":o.indeterminate=!0;for(const t of document.querySelectorAll("#observablehq-sidebar summary")){const s=t.parentElement;switch(sessionStorage.getItem(`observablehq-sidebar:${t.textContent}`)){case"true":s.open=!0;break;case"false":s.classList.contains("observablehq-section-active")||(s.open=!1);break}}addEventListener("beforeunload",()=>sessionStorage.setItem("observablehq-sidebar-scrolly",`${e.scrollTop}`));const a=sessionStorage.getItem("observablehq-sidebar-scrolly");a!=null&&(e.style.cssText="overflow: hidden;",e.scrollTop=+a,e.style.cssText="");}</script>
 <div id="observablehq-center">
@@ -95,7 +89,7 @@ new Runtime().module(define, name => {
 </main>
 <footer id="observablehq-footer">
 <nav><a rel="prev" href="../groblje/Bosna"><span>  Groblje</span></a><a rel="next" href="../katastar/Bosna"><span>  Katastar</span></a></nav>
-<div>Built with <a href="https://observablehq.com/" target="_blank" rel="noopener noreferrer">Observable</a> on <a title="2025-11-09T09:19:51">Nov 9, 2025</a>.</div>
+<div><small>© 2025 Built by Ivan Jularić</small></div>
 </footer>
 </div>
 </body>

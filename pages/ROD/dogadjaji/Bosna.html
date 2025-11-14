@@ -36,9 +36,9 @@ import "../../../_observablehq/client.e9d881c7.js";
     <li class="observablehq-link"><a href="../obitelji/Bosna">  Obitelji</a></li>
     <li class="observablehq-link observablehq-link-active"><a href="./Bosna">  Događaji</a></li>
     <li class="observablehq-link"><a href="../stablo/Bosna">  Stablo</a></li>
-    <li class="observablehq-link"><a href="../bolesti/Bosna">  Bolesti</a></li>
     <li class="observablehq-link"><a href="../mjesta/Bosna">  Mjesta</a></li>
     <li class="observablehq-link"><a href="../migracije/Bosna">  Migracije</a></li>
+    <li class="observablehq-link"><a href="../bolesti/Bosna">  Bolesti</a></li>
     <li class="observablehq-link"><a href="../izvori/Bosna">  Izvori*</a></li>
     <li class="observablehq-link"><a href="../zupe/Bosna">  Župe</a></li>
     </ol>
@@ -65,12 +65,6 @@ import "../../../_observablehq/client.e9d881c7.js";
     <li class="observablehq-link"><a href="../pismo/Bosna">  Pismo / Jezik</a></li>
     </ol>
   </section>
-  <section>
-    <summary>----------</summary>
-    <ol>
-    <li class="observablehq-link"><a href="../../KONCEPT/Navigacija">Sadržaj</a></li>
-    </ol>
-  </section>
 </nav>
 <script>{const e=document.querySelector("#observablehq-sidebar"),o=document.querySelector("#observablehq-sidebar-toggle"),r=sessionStorage.getItem("observablehq-sidebar");r?o.checked=r==="true":o.indeterminate=!0;for(const t of document.querySelectorAll("#observablehq-sidebar summary")){const s=t.parentElement;switch(sessionStorage.getItem(`observablehq-sidebar:${t.textContent}`)){case"true":s.open=!0;break;case"false":s.classList.contains("observablehq-section-active")||(s.open=!1);break}}addEventListener("beforeunload",()=>sessionStorage.setItem("observablehq-sidebar-scrolly",`${e.scrollTop}`));const a=sessionStorage.getItem("observablehq-sidebar-scrolly");a!=null&&(e.style.cssText="overflow: hidden;",e.scrollTop=+a,e.style.cssText="");}</script>
 <div id="observablehq-center">
@@ -79,23 +73,25 @@ import "../../../_observablehq/client.e9d881c7.js";
 </nav>
 </aside>
 <main id="observablehq-main" class="observablehq">
-<div id="observablehq-dogadjaji_header-10270e77"></div>
-<div id="observablehq-prezime_plot-10270e77"></div>
-<div id="observablehq-dogadjaji_plot-10270e77"></div>
+<div id="observablehq-dogadjaji_header-8e3c3e0b"></div>
+<div id="observablehq-text_1-8e3c3e0b"></div>
+<div id="observablehq-prezime_plot-8e3c3e0b"></div>
+<div id="observablehq-text_2-8e3c3e0b"></div>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@observablehq/inspector@5/dist/inspector.css">
 <script type="module">
 import {Runtime, Inspector} from "https://cdn.jsdelivr.net/npm/@observablehq/runtime@5/dist/runtime.js";
 import define from "https://api.observablehq.com/d/aa7fb7f01cf66d07.js?v=4";
 new Runtime().module(define, name => {
-  if (name === "dogadjaji_header") return new Inspector(document.querySelector("#observablehq-dogadjaji_header-10270e77"));
-  if (name === "prezime_plot") return new Inspector(document.querySelector("#observablehq-prezime_plot-10270e77"));
-  if (name === "dogadjaji_plot") return new Inspector(document.querySelector("#observablehq-dogadjaji_plot-10270e77"));
+  if (name === "dogadjaji_header") return new Inspector(document.querySelector("#observablehq-dogadjaji_header-8e3c3e0b"));
+  if (name === "text_1") return new Inspector(document.querySelector("#observablehq-text_1-8e3c3e0b"));
+  if (name === "prezime_plot") return new Inspector(document.querySelector("#observablehq-prezime_plot-8e3c3e0b"));
+  if (name === "text_2") return new Inspector(document.querySelector("#observablehq-text_2-8e3c3e0b"));
 });
 </script>
 </main>
 <footer id="observablehq-footer">
 <nav><a rel="prev" href="../obitelji/Bosna"><span>  Obitelji</span></a><a rel="next" href="../stablo/Bosna"><span>  Stablo</span></a></nav>
-<div>Built with <a href="https://observablehq.com/" target="_blank" rel="noopener noreferrer">Observable</a> on <a title="2025-11-09T09:19:51">Nov 9, 2025</a>.</div>
+<div><small>© 2025 Built by Ivan Jularić</small></div>
 </footer>
 </div>
 </body>
