@@ -62,8 +62,11 @@ const PDF_TASKS = (() => {
     }
   }
   return [
-    // { name: "koncept.pdf",  pages: ["pages/KONCEPT*"] },
-    { name: "rod.pdf", menu: ["pages/Bosna_menu.json*"] },
+    { name: "mjesta.pdf",    menu: ["pages/menu.json"] },
+    { name: "obitelji.pdf",  menu: ["pages/obitelji.json"] },  
+    { name: "zapisi.pdf",    menu: ["pages/zapisi.json"] },   
+    { name: "izvori.pdf",    menu: ["pages/izvori.json"] },       
+    { name: "rod.pdf",       menu: ["pages/Bosna_menu.json*"] },
     // { name: "matice.pdf",   menu: ["pages/Matice_menu.json*"] },
   ];
 })();
